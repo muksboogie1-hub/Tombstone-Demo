@@ -1,6 +1,7 @@
-import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
+import { getSupabaseClient, isSupabaseConfigured, formatSupabaseError } from '../lib/supabaseClient';
 import { WebsiteContent } from '../types/content';
 import { DEFAULT_WEBSITE_CONTENT } from '../data/defaultContent';
+import { getCurrentAdminUser } from './authService';
 
 export interface ContentFetchResult {
   data: WebsiteContent;
@@ -9,6 +10,8 @@ export interface ContentFetchResult {
   isEmptyTable: boolean;
   isOffline: boolean;
 }
+
+const LOCAL_CONTENT_CACHE_KEY = 'velquarath_stoneworks_content_cache';
 
 const SECTION_KEYS: (keyof WebsiteContent)[] = [
   'announcement',
@@ -22,14 +25,45 @@ const SECTION_KEYS: (keyof WebsiteContent)[] = [
 ];
 
 /**
- * Fetches all website content sections from Supabase.
- * Merges with default content to ensure every field is always populated.
+ * Checks whether the active user has a live authenticated Supabase session.
+ */
+async function isSupabaseSession(): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+  try {
+    const user = await getCurrentAdminUser();
+    return Boolean(user && user.isSupabaseAuth);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Fetches all website content sections with local caching and offline fallback.
+ * Merges with default baseline so every section is always reliably populated.
  */
 export async function fetchWebsiteContent(): Promise<ContentFetchResult> {
-  if (!isSupabaseConfigured()) {
+  const getCachedOrBaseline = (): WebsiteContent => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem(LOCAL_CONTENT_CACHE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && typeof parsed === 'object') {
+            return { ...DEFAULT_WEBSITE_CONTENT, ...parsed };
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+    return DEFAULT_WEBSITE_CONTENT;
+  };
+
+  const client = getSupabaseClient();
+  if (!client || !isSupabaseConfigured()) {
     return {
-      data: DEFAULT_WEBSITE_CONTENT,
-      error: new Error('Supabase credentials not configured in environment'),
+      data: getCachedOrBaseline(),
+      error: null,
       isMissingTable: false,
       isEmptyTable: false,
       isOffline: true,
@@ -37,27 +71,26 @@ export async function fetchWebsiteContent(): Promise<ContentFetchResult> {
   }
 
   try {
-    const { data, error } = await supabase
-      .from('website_content')
-      .select('*');
+    const { data, error } = await client.from('website_content').select('*');
 
     if (error) {
       const isMissing =
         error.code === '42P01' ||
+        error.code === 'PGRST205' ||
         Boolean(error.message && error.message.toLowerCase().includes('does not exist'));
 
       return {
-        data: DEFAULT_WEBSITE_CONTENT,
-        error: new Error(error.message),
+        data: getCachedOrBaseline(),
+        error: new Error(formatSupabaseError(error)),
         isMissingTable: isMissing,
         isEmptyTable: false,
-        isOffline: !isMissing,
+        isOffline: true,
       };
     }
 
     if (!data || data.length === 0) {
       return {
-        data: DEFAULT_WEBSITE_CONTENT,
+        data: getCachedOrBaseline(),
         error: null,
         isMissingTable: false,
         isEmptyTable: true,
@@ -65,7 +98,7 @@ export async function fetchWebsiteContent(): Promise<ContentFetchResult> {
       };
     }
 
-    // Merge database values on top of default baseline
+    // Merge database values on top of baseline
     const merged: WebsiteContent = { ...DEFAULT_WEBSITE_CONTENT };
     for (const row of data) {
       const sectionKey = row.key as keyof WebsiteContent;
@@ -74,6 +107,15 @@ export async function fetchWebsiteContent(): Promise<ContentFetchResult> {
           ...DEFAULT_WEBSITE_CONTENT[sectionKey],
           ...row.value,
         };
+      }
+    }
+
+    // Cache merged content in localStorage
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(LOCAL_CONTENT_CACHE_KEY, JSON.stringify(merged));
+      } catch {
+        // ignore
       }
     }
 
@@ -86,7 +128,7 @@ export async function fetchWebsiteContent(): Promise<ContentFetchResult> {
     };
   } catch (err: any) {
     return {
-      data: DEFAULT_WEBSITE_CONTENT,
+      data: getCachedOrBaseline(),
       error: err instanceof Error ? err : new Error(String(err)),
       isMissingTable: false,
       isEmptyTable: false,
@@ -96,28 +138,54 @@ export async function fetchWebsiteContent(): Promise<ContentFetchResult> {
 }
 
 /**
- * Admin: Save a specific website content section to Supabase
+ * Admin: Save a specific website content section.
+ * Supports live Supabase updates and preview sandbox local caching.
  */
 export async function saveContentSection(
   sectionKey: keyof WebsiteContent,
   value: any,
   currentUserId?: string
 ): Promise<{ success: boolean; error: Error | null }> {
+  const hasLive = await isSupabaseSession();
+  const client = getSupabaseClient();
+
+  // Always update local cache so changes appear immediately
+  if (typeof window !== 'undefined') {
+    try {
+      const cached = localStorage.getItem(LOCAL_CONTENT_CACHE_KEY);
+      const current = cached ? JSON.parse(cached) : { ...DEFAULT_WEBSITE_CONTENT };
+      current[sectionKey] = value;
+      localStorage.setItem(LOCAL_CONTENT_CACHE_KEY, JSON.stringify(current));
+    } catch {
+      // ignore
+    }
+  }
+
+  // Preview sandbox mode
+  if (!hasLive || !client) {
+    return { success: true, error: null };
+  }
+
+  // Live Supabase update
   try {
+    const user = await getCurrentAdminUser();
     const payload = {
       key: sectionKey,
       section: sectionKey,
       value,
       is_published: true,
-      updated_by: currentUserId || null,
+      updated_by: currentUserId || user?.id || null,
       updated_at: new Date().toISOString(),
     };
 
-    const { error } = await supabase
+    const { error } = await client
       .from('website_content')
       .upsert(payload, { onConflict: 'key' });
 
-    if (error) throw error;
+    if (error) {
+      throw new Error(formatSupabaseError(error));
+    }
+
     return { success: true, error: null };
   } catch (err: any) {
     return { success: false, error: err instanceof Error ? err : new Error(String(err)) };
@@ -125,7 +193,7 @@ export async function saveContentSection(
 }
 
 /**
- * Admin: Reset a content section back to default
+ * Admin: Reset a content section back to default baseline.
  */
 export async function resetContentSection(
   sectionKey: keyof WebsiteContent,
@@ -136,9 +204,14 @@ export async function resetContentSection(
 }
 
 /**
- * Admin: Seed initial website content records to Supabase
+ * Admin: Seed default website content records into Supabase.
  */
 export async function seedContentToSupabase(): Promise<{ count: number; error: Error | null }> {
+  const client = getSupabaseClient();
+  if (!client) {
+    return { count: 0, error: new Error('Supabase client is not configured') };
+  }
+
   try {
     const rows = SECTION_KEYS.map((key) => ({
       key,
@@ -148,13 +221,13 @@ export async function seedContentToSupabase(): Promise<{ count: number; error: E
       updated_at: new Date().toISOString(),
     }));
 
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from('website_content')
       .upsert(rows, { onConflict: 'key', ignoreDuplicates: true })
       .select();
 
-    if (error) throw error;
-    return { count: data?.length || 0, error: null };
+    if (error) throw new Error(formatSupabaseError(error));
+    return { count: data?.length || rows.length, error: null };
   } catch (err: any) {
     return { count: 0, error: err instanceof Error ? err : new Error(String(err)) };
   }

@@ -1,21 +1,6 @@
-import { useState, useEffect } from 'react';
-import { Sparkles, RefreshCw, ArrowRight } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
-interface BrandedLoadingScreenProps {
-  onRetry?: () => void;
-  onProceedAnyway?: () => void;
-}
-
-export function BrandedLoadingScreen({ onRetry, onProceedAnyway }: BrandedLoadingScreenProps) {
-  const [showDelayedPrompt, setShowDelayedPrompt] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowDelayedPrompt(true);
-    }, 2800);
-    return () => clearTimeout(timer);
-  }, []);
-
+export function BrandedLoadingScreen() {
   return (
     <div
       role="status"
@@ -55,32 +40,8 @@ export function BrandedLoadingScreen({ onRetry, onProceedAnyway }: BrandedLoadin
         </div>
 
         <p className="text-xs text-[#B9B5AC] font-light">
-          Loading Artisanal Stonework Portfolio & Materials...
+          Loading Artisanal Stonework Portfolio &amp; Materials...
         </p>
-
-        {/* Degraded Network Handling */}
-        {showDelayedPrompt && (
-          <div className="pt-4 border-t border-[#2D3237] w-full flex flex-col sm:flex-row items-center justify-center gap-3 animate-fade-in">
-            {onRetry && (
-              <button
-                onClick={onRetry}
-                className="inline-flex items-center gap-1.5 text-xs text-[#B79A68] hover:text-[#CBB17F] font-semibold uppercase tracking-wider py-2 px-3 rounded border border-[#B79A68]/30 hover:border-[#B79A68] transition-colors cursor-pointer"
-              >
-                <RefreshCw className="w-3.5 h-3.5" />
-                <span>Retry Connection</span>
-              </button>
-            )}
-            {onProceedAnyway && (
-              <button
-                onClick={onProceedAnyway}
-                className="inline-flex items-center gap-1.5 text-xs text-[#DFD9CB] hover:text-white font-semibold uppercase tracking-wider py-2 px-3 rounded bg-[#252A2E] hover:bg-[#2F353A] transition-colors cursor-pointer"
-              >
-                <span>Continue to Site</span>
-                <ArrowRight className="w-3.5 h-3.5 text-[#B79A68]" />
-              </button>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );

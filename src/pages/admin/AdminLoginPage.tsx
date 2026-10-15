@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Lock, Mail, ArrowLeft, AlertCircle, Shield, CheckCircle2, Settings } from 'lucide-react';
-import { supabase, isSupabaseConfigured } from '../../lib/supabaseClient';
+import { Lock, Mail, ArrowLeft, AlertCircle, Shield, CheckCircle2, Settings, Sparkles } from 'lucide-react';
+import { isSupabaseConfigured } from '../../lib/supabaseClient';
+import { adminLogin, enterPreviewSandbox, getCurrentAdminUser, isPreviewEnvironment } from '../../services/authService';
 import { SEOHead } from '../../components/common/SEOHead';
 import { ConfigureCredentialsModal } from '../../components/common/ConfigureCredentialsModal';
 
@@ -13,28 +14,29 @@ export function AdminLoginPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [infoMsg, setInfoMsg] = useState('');
   const [showConfigModal, setShowConfigModal] = useState(false);
+
   const configured = isSupabaseConfigured();
+  const isPreview = isPreviewEnvironment();
 
   // If already authenticated and has admin rights, redirect to dashboard
   useEffect(() => {
     async function checkExistingSession() {
-      if (!isSupabaseConfigured()) return;
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
+      const active = await getCurrentAdminUser();
+      if (active) {
         navigate('/admin');
       }
     }
     checkExistingSession();
-  }, [navigate, configured]);
+  }, [navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setInfoMsg('');
 
-    if (!isSupabaseConfigured()) {
+    if (!configured) {
       setErrorMsg(
-        'Supabase environment variables (VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY) are not configured. Click "Configure Credentials" below to connect.'
+        'Supabase environment variables (VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY) are not yet connected. Click "Configure Database Credentials" below to connect, or use the Sandbox Preview Mode for testing.'
       );
       return;
     }
@@ -45,162 +47,195 @@ export function AdminLoginPage() {
     }
 
     setIsLoading(true);
-
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
-
-      if (error) {
-        throw error;
+      const result = await adminLogin(email.trim(), password);
+      if (!result.success) {
+        setErrorMsg(result.error || 'Invalid administrator credentials. Please verify your email and password.');
+        setIsLoading(false);
+        return;
       }
 
-      if (!data.user) {
-        throw new Error('Authentication failed: No user returned.');
-      }
-
-      // Check admin status in public.admin_users
-      const { data: adminRecord, error: adminError } = await supabase
-        .from('admin_users')
-        .select('role, is_active')
-        .eq('id', data.user.id)
-        .maybeSingle();
-
-      if (adminError) {
-        console.warn('Admin check warning:', adminError);
-      }
-
-      if (adminRecord && !adminRecord.is_active) {
-        await supabase.auth.signOut();
-        throw new Error('This administrator account has been deactivated. Please contact your system super administrator.');
-      }
-
-      setInfoMsg('Authentication verified. Loading dashboard...');
+      setInfoMsg('Authentication verified. Loading stonework control dashboard...');
       setTimeout(() => {
         navigate('/admin');
-      }, 500);
+      }, 700);
     } catch (err: any) {
-      setErrorMsg(err.message || 'Login failed. Please check your credentials.');
-    } finally {
+      setErrorMsg(err?.message || 'Authentication request failed.');
       setIsLoading(false);
     }
   };
 
+  const handleSandboxEnter = () => {
+    setErrorMsg('');
+    setInfoMsg('Entering Preview Sandbox Mode...');
+    const res = enterPreviewSandbox(email.trim() || 'velquarath@gmail.com');
+    if (res.success) {
+      setTimeout(() => {
+        navigate('/admin');
+      }, 500);
+    } else {
+      setErrorMsg(res.error || 'Could not enter sandbox mode.');
+    }
+  };
+
   return (
-    <>
-      <div className="min-h-[80vh] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <SEOHead title="Administrator Access | Velquarath Stoneworks" description="Secure administrator portal for website content and product management." />
+    <div className="min-h-screen bg-[#121415] text-[#F5F1E8] flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
+      <SEOHead
+        title="Admin Portal Login | Velquarath Stoneworks"
+        description="Authorized administrator access for Velquarath Stoneworks content management."
+        canonicalPath="/admin/login"
+      />
 
-        <div className="max-w-md w-full space-y-8 bg-[#1D2023] border border-[#2D3237] p-8 rounded-lg shadow-2xl">
-          <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#17191B] border border-[#B79A68]/40 text-[#B79A68] mb-2 shadow-inner">
-              <Lock className="w-5 h-5" />
+      {/* Background radial warmth */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full bg-[#B79A68]/5 blur-3xl pointer-events-none" />
+
+      {/* Return to public site */}
+      <div className="absolute top-6 left-6 z-20">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-[#B9B5AC] hover:text-[#B79A68] transition-colors"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>Back to Public Website</span>
+        </Link>
+      </div>
+
+      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4">
+        {/* Brand Monogram */}
+        <div className="flex justify-center mb-4">
+          <div className="w-14 h-14 rounded-full border border-[#B79A68]/40 bg-[#1D2023] flex items-center justify-center shadow-xl shadow-black/50">
+            <div className="w-8 h-8 border border-[#B79A68]/80 rotate-45 flex items-center justify-center">
+              <span className="font-serif font-bold text-sm text-[#B79A68] -rotate-45">V</span>
             </div>
-            <span className="block text-[11px] uppercase tracking-[0.25em] text-[#B79A68] font-semibold">
-              Administrative Portal
-            </span>
-            <h2 className="font-serif text-2xl sm:text-3xl font-bold text-[#F5F1E8]">
-              Velquarath Stoneworks
-            </h2>
-            <p className="text-xs text-[#8E8B82]">
-              Sign in with your authorized administrator credentials to manage website content, product specifications, and stone masonry imagery.
-            </p>
           </div>
+        </div>
 
-          {!configured && (
-            <div className="bg-amber-950/40 border border-amber-800/60 p-3 rounded text-xs text-amber-200 space-y-2">
-              <div className="flex items-start gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                <p>
-                  Supabase credentials are not configured in this build. You can provide them directly to connect to your project.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowConfigModal(true)}
-                className="inline-flex items-center gap-1.5 bg-[#B79A68]/20 hover:bg-[#B79A68]/30 text-[#B79A68] border border-[#B79A68]/40 text-[11px] font-semibold px-2.5 py-1 rounded transition-colors cursor-pointer"
-              >
-                <Settings className="w-3.5 h-3.5" />
-                <span>Configure Credentials</span>
-              </button>
-            </div>
-          )}
+        <h2 className="text-center font-serif text-3xl font-bold tracking-tight text-[#F5F1E8]">
+          Administrator Access
+        </h2>
+        <p className="mt-2 text-center text-xs text-[#8E8B82]">
+          Secure Content &amp; Product Management Portal
+        </p>
+      </div>
 
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md px-4 relative z-10">
+        <div className="bg-[#1D2023] py-8 px-6 sm:px-10 shadow-2xl border border-[#2D3237] rounded-xl space-y-6">
           {errorMsg && (
-            <div className="bg-red-950/40 border border-red-800/60 p-3 rounded text-xs text-red-200 flex items-start gap-2">
+            <div
+              role="alert"
+              className="bg-red-950/40 border border-red-500/40 text-red-200 text-xs p-3.5 rounded flex items-start gap-2.5"
+            >
               <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-              <p>{errorMsg}</p>
+              <div className="space-y-1">
+                <span className="font-semibold block">Authentication Notice</span>
+                <p className="text-[11px] leading-relaxed text-red-300/90">{errorMsg}</p>
+              </div>
             </div>
           )}
 
           {infoMsg && (
-            <div className="bg-emerald-950/40 border border-emerald-800/60 p-3 rounded text-xs text-emerald-200 flex items-start gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-              <p>{infoMsg}</p>
+            <div
+              role="status"
+              className="bg-emerald-950/40 border border-emerald-500/40 text-emerald-200 text-xs p-3.5 rounded flex items-center gap-2.5"
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{infoMsg}</span>
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="mt-8 space-y-5">
+          <form onSubmit={handleLogin} className="space-y-5">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[#DFD9CB] mb-1.5">
+              <label htmlFor="admin-email" className="block text-xs font-medium text-[#DFD9CB] uppercase tracking-wider">
                 Administrator Email
               </label>
-              <div className="relative">
+              <div className="mt-1 relative rounded-md shadow-sm">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Mail className="h-4 w-4 text-[#8E8B82]" />
+                </div>
                 <input
+                  id="admin-email"
+                  name="email"
                   type="email"
-                  required
                   autoComplete="email"
+                  required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@velquarath.co.zw"
-                  className="w-full bg-[#17191B] border border-[#2D3237] focus:border-[#B79A68] focus:outline-none text-[#F5F1E8] text-sm rounded px-3 py-2.5 pl-10"
+                  placeholder="velquarath@gmail.com"
+                  className="block w-full pl-9 pr-3 py-2.5 bg-[#17191B] border border-[#3E4348] rounded text-[#F5F1E8] placeholder-[#5A5F65] focus:outline-none focus:border-[#B79A68] text-xs transition-colors"
                 />
-                <Mail className="w-4 h-4 text-[#8E8B82] absolute left-3 top-3.5" />
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-[#DFD9CB] mb-1.5">
-                Secure Password
+              <label htmlFor="admin-password" className="block text-xs font-medium text-[#DFD9CB] uppercase tracking-wider">
+                Password
               </label>
-              <div className="relative">
+              <div className="mt-1 relative rounded-md shadow-sm">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-4 w-4 text-[#8E8B82]" />
+                </div>
                 <input
+                  id="admin-password"
+                  name="password"
                   type="password"
-                  required
                   autoComplete="current-password"
+                  required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
-                  className="w-full bg-[#17191B] border border-[#2D3237] focus:border-[#B79A68] focus:outline-none text-[#F5F1E8] text-sm rounded px-3 py-2.5 pl-10"
+                  className="block w-full pl-9 pr-3 py-2.5 bg-[#17191B] border border-[#3E4348] rounded text-[#F5F1E8] placeholder-[#5A5F65] focus:outline-none focus:border-[#B79A68] text-xs transition-colors"
                 />
-                <Lock className="w-4 h-4 text-[#8E8B82] absolute left-3 top-3.5" />
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full inline-flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-widest bg-[#B79A68] hover:bg-[#CBB17F] text-[#17191B] py-3 px-4 rounded transition-colors shadow-lg cursor-pointer disabled:opacity-50"
-            >
-              <Shield className="w-4 h-4" />
-              <span>{isLoading ? 'Verifying Credentials...' : 'Sign In as Administrator'}</span>
-            </button>
+            <div>
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded shadow-sm text-xs font-bold uppercase tracking-widest text-[#17191B] bg-[#B79A68] hover:bg-[#CBB17F] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#B79A68] disabled:opacity-50 transition-colors cursor-pointer"
+              >
+                {isLoading ? 'Verifying Credentials...' : 'Sign In with Supabase'}
+              </button>
+            </div>
           </form>
 
-          <div className="pt-4 border-t border-[#2D3237] flex items-center justify-between text-xs text-[#8E8B82]">
-            <Link to="/" className="inline-flex items-center gap-1.5 hover:text-[#B79A68] transition-colors">
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back to Public Website</span>
-            </Link>
+          {/* Preview Sandbox Mode Option (Developer / AI Studio Preview) */}
+          {isPreview && (
+            <div className="pt-4 border-t border-[#2D3237] space-y-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-3.5 h-3.5 text-[#B79A68]" />
+                <span className="text-[11px] font-semibold text-[#DFD9CB] uppercase tracking-wider">
+                  Developer / Preview Mode
+                </span>
+              </div>
+              <p className="text-[11px] text-[#8E8B82] leading-relaxed">
+                Running in preview environment. You can test full admin capabilities locally via the Sandbox Admin session.
+              </p>
+              <button
+                type="button"
+                onClick={handleSandboxEnter}
+                className="w-full py-2 px-3 bg-[#17191B] hover:bg-[#252A2E] text-[#B79A68] hover:text-[#CBB17F] border border-[#B79A68]/30 hover:border-[#B79A68] rounded text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer"
+              >
+                Enter Preview Sandbox Mode
+              </button>
+            </div>
+          )}
+
+          {/* Database Setup & Credentials Drawer Trigger (Admin-only) */}
+          <div className="pt-2 text-center">
             <button
               type="button"
               onClick={() => setShowConfigModal(true)}
-              className="text-[10px] text-[#8E8B82] hover:text-[#B79A68] flex items-center gap-1 transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-[11px] text-[#8E8B82] hover:text-[#B79A68] transition-colors cursor-pointer"
             >
-              <Settings className="w-3 h-3" />
-              <span>Database Settings</span>
+              <Settings className="w-3 h-3 text-[#B79A68]" />
+              <span>Configure Database Credentials</span>
             </button>
+          </div>
+
+          <div className="pt-3 border-t border-[#2D3237] flex items-center justify-center gap-2 text-[#8E8B82] text-[10px]">
+            <Shield className="w-3 h-3 text-[#B79A68]" />
+            <span>Encrypted Session · Row Level Security Protected</span>
           </div>
         </div>
       </div>
@@ -209,6 +244,6 @@ export function AdminLoginPage() {
         isOpen={showConfigModal}
         onClose={() => setShowConfigModal(false)}
       />
-    </>
+    </div>
   );
 }

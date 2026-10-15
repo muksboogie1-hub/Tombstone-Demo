@@ -116,7 +116,7 @@ export function ConfigureCredentialsModal({ isOpen, onClose }: ConfigureCredenti
             </div>
             <p className="text-[#8E8B82] text-[11px] leading-relaxed">
               {currentConfig
-                ? `Using ${currentConfig.source === 'build_env' ? 'Cloudflare build-time environment variables' : 'browser runtime credentials'}.`
+                ? `Using ${currentConfig.source === 'build_time_env' ? 'Cloudflare build-time environment variables' : 'browser runtime credentials'}.`
                 : 'Vite build environment variables were missing when this bundle was deployed.'}
             </p>
           </div>
@@ -198,7 +198,7 @@ export function ConfigureCredentialsModal({ isOpen, onClose }: ConfigureCredenti
                 <span>{isTesting ? 'Testing Connection...' : 'Test & Connect'}</span>
               </button>
 
-              {currentConfig?.source === 'local_storage' && (
+              {currentConfig?.source === 'browser_storage' && (
                 <button
                   type="button"
                   onClick={handleClear}

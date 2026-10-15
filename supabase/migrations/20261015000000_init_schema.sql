@@ -1,8 +1,7 @@
 -- ============================================================================
--- VELQUARATH STONEWORKS: DATABASE SCHEMA & SECURITY DEFINER RLS MIGRATION
+-- VELQUARATH STONEWORKS: PRODUCTION HARDENED SUPABASE MIGRATION
 -- ============================================================================
 
--- Enable required UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- 1. Create Public Storage Bucket for Website Assets
@@ -11,22 +10,21 @@ VALUES (
   'website-assets',
   'website-assets',
   true,
-  10485760, -- 10MB
-  ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml']::text[]
-)
-ON CONFLICT (id) DO UPDATE SET
+  52428800, -- 50MB
+  ARRAY['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml']::text[]
+) ON CONFLICT (id) DO UPDATE SET
   public = true,
-  file_size_limit = EXCLUDED.file_size_limit,
-  allowed_mime_types = EXCLUDED.allowed_mime_types;
+  file_size_limit = 52428800;
 
--- 2. Create Table: admin_users
+-- 2. Create Table: admin_users (Allows pre-seeding owners before they register in auth)
 CREATE TABLE IF NOT EXISTS public.admin_users (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  email TEXT NOT NULL UNIQUE,
-  role TEXT NOT NULL DEFAULT 'administrator' CHECK (role IN ('super_admin', 'administrator', 'editor')),
-  is_active BOOLEAN NOT NULL DEFAULT true,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
+  email TEXT UNIQUE NOT NULL,
+  role TEXT DEFAULT 'administrator',
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
 
 -- 3. Create Table: website_content
@@ -35,7 +33,7 @@ CREATE TABLE IF NOT EXISTS public.website_content (
   section TEXT NOT NULL,
   value JSONB NOT NULL,
   is_published BOOLEAN NOT NULL DEFAULT true,
-  updated_by UUID REFERENCES public.admin_users(id),
+  updated_by UUID,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -58,7 +56,7 @@ CREATE TABLE IF NOT EXISTS public.products (
   price_note TEXT,
   sort_order INTEGER NOT NULL DEFAULT 0,
   is_published BOOLEAN NOT NULL DEFAULT true,
-  updated_by UUID REFERENCES public.admin_users(id),
+  updated_by UUID,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
@@ -68,149 +66,133 @@ CREATE INDEX IF NOT EXISTS idx_products_featured ON public.products(featured);
 CREATE INDEX IF NOT EXISTS idx_products_sort_order ON public.products(sort_order);
 CREATE INDEX IF NOT EXISTS idx_website_content_section ON public.website_content(section);
 
--- ============================================================================
--- SECURITY DEFINER HELPER FUNCTIONS (Zero RLS Recursion)
--- ============================================================================
-
--- Function 1: Check if calling user is active administrator
+-- 5. Security Definer Authorization Helper (Zero RLS Recursion)
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
 STABLE
+SET search_path = public, pg_temp
 AS $$
 BEGIN
-  RETURN EXISTS (
-    SELECT 1 
-    FROM public.admin_users 
-    WHERE id = auth.uid() 
-      AND is_active = true
-  );
+    IF auth.uid() IS NULL THEN
+        RETURN FALSE;
+    END IF;
+    RETURN EXISTS (
+        SELECT 1 FROM public.admin_users
+        WHERE (
+            user_id = auth.uid()
+            OR (
+                (auth.jwt() ->> 'email') IS NOT NULL
+                AND LOWER(email) = LOWER(auth.jwt() ->> 'email')
+            )
+        )
+        AND is_active = TRUE
+    );
 END;
 $$;
 
--- Function 2: Check if calling user is active super administrator
-CREATE OR REPLACE FUNCTION public.is_super_admin()
+REVOKE EXECUTE ON FUNCTION public.is_admin() FROM public;
+GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated, anon;
+
+-- 6. Self-healing Sync RPC for Authenticated Clients
+CREATE OR REPLACE FUNCTION public.sync_current_admin()
 RETURNS BOOLEAN
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public, pg_temp
-STABLE
 AS $$
+DECLARE
+    v_affected_rows integer;
 BEGIN
-  RETURN EXISTS (
-    SELECT 1 
-    FROM public.admin_users 
-    WHERE id = auth.uid() 
-      AND role = 'super_admin' 
-      AND is_active = true
-  );
+    IF auth.uid() IS NULL OR (auth.jwt() ->> 'email') IS NULL THEN
+        RETURN FALSE;
+    END IF;
+    UPDATE public.admin_users
+    SET user_id = auth.uid(), updated_at = NOW()
+    WHERE LOWER(email) = LOWER(auth.jwt() ->> 'email')
+      AND (user_id IS NULL OR user_id <> auth.uid())
+      AND is_active = TRUE;
+    GET DIAGNOSTICS v_affected_rows = ROW_COUNT;
+    RETURN v_affected_rows > 0;
 END;
 $$;
 
--- Revoke default public execution privileges and grant explicitly to authenticated
-REVOKE ALL ON FUNCTION public.is_admin() FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.is_super_admin() FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.is_admin() TO authenticated;
-GRANT EXECUTE ON FUNCTION public.is_super_admin() TO authenticated;
+REVOKE EXECUTE ON FUNCTION public.sync_current_admin() FROM public;
+GRANT EXECUTE ON FUNCTION public.sync_current_admin() TO authenticated;
 
--- ============================================================================
--- ROW LEVEL SECURITY (RLS) POLICIES
--- ============================================================================
+-- 7. Trigger: Automatically Link Registered Supabase Auth User ID to Whitelist
+CREATE OR REPLACE FUNCTION public.handle_admin_auth_sync()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+BEGIN
+    UPDATE public.admin_users
+    SET user_id = NEW.id, updated_at = NOW()
+    WHERE LOWER(email) = LOWER(NEW.email)
+      AND is_active = TRUE;
+    RETURN NEW;
+END;
+$$;
 
+DROP TRIGGER IF EXISTS on_auth_user_created_admin_sync ON auth.users;
+CREATE TRIGGER on_auth_user_created_admin_sync
+    AFTER INSERT OR UPDATE ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION public.handle_admin_auth_sync();
+
+-- 8. Enable Row Level Security
 ALTER TABLE public.admin_users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.website_content ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 
--- 1. Policies for admin_users
-DROP POLICY IF EXISTS "Users can view own admin record" ON public.admin_users;
-CREATE POLICY "Users can view own admin record"
-  ON public.admin_users FOR SELECT
-  TO authenticated
-  USING (auth.uid() = id);
+-- 9. Public Read Policies
+DROP POLICY IF EXISTS "Public can view products" ON public.products;
+CREATE POLICY "Public can view products" ON public.products FOR SELECT USING (is_published = true OR public.is_admin());
 
-DROP POLICY IF EXISTS "Super admins can manage admin roster" ON public.admin_users;
-CREATE POLICY "Super admins can manage admin roster"
-  ON public.admin_users FOR ALL
-  TO authenticated
-  USING (public.is_super_admin())
-  WITH CHECK (public.is_super_admin());
+DROP POLICY IF EXISTS "Public can view website content" ON public.website_content;
+CREATE POLICY "Public can view website content" ON public.website_content FOR SELECT USING (is_published = true OR public.is_admin());
 
--- 2. Policies for website_content
-DROP POLICY IF EXISTS "Public read published content" ON public.website_content;
-CREATE POLICY "Public read published content"
-  ON public.website_content FOR SELECT
-  TO anon, authenticated
-  USING (is_published = true OR public.is_admin());
+-- 10. Admin Write Policies
+DROP POLICY IF EXISTS "Admin full access to products" ON public.products;
+CREATE POLICY "Admin full access to products" ON public.products FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
-DROP POLICY IF EXISTS "Admin insert content" ON public.website_content;
-CREATE POLICY "Admin insert content"
-  ON public.website_content FOR INSERT
-  TO authenticated
-  WITH CHECK (public.is_admin());
+DROP POLICY IF EXISTS "Admin full access to website content" ON public.website_content;
+CREATE POLICY "Admin full access to website content" ON public.website_content FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
-DROP POLICY IF EXISTS "Admin update content" ON public.website_content;
-CREATE POLICY "Admin update content"
-  ON public.website_content FOR UPDATE
-  TO authenticated
-  USING (public.is_admin())
-  WITH CHECK (public.is_admin());
+DROP POLICY IF EXISTS "Admin view own or all admin_users" ON public.admin_users;
+CREATE POLICY "Admin view own or all admin_users" ON public.admin_users FOR SELECT USING (public.is_admin() OR user_id = auth.uid() OR LOWER(email) = LOWER(auth.jwt() ->> 'email'));
 
-DROP POLICY IF EXISTS "Admin delete content" ON public.website_content;
-CREATE POLICY "Admin delete content"
-  ON public.website_content FOR DELETE
-  TO authenticated
-  USING (public.is_admin());
+DROP POLICY IF EXISTS "Admin modify admin_users" ON public.admin_users;
+CREATE POLICY "Admin modify admin_users" ON public.admin_users FOR ALL USING (public.is_admin()) WITH CHECK (public.is_admin());
 
--- 3. Policies for products
-DROP POLICY IF EXISTS "Public read published products" ON public.products;
-CREATE POLICY "Public read published products"
-  ON public.products FOR SELECT
-  TO anon, authenticated
-  USING (is_published = true OR public.is_admin());
-
-DROP POLICY IF EXISTS "Admin insert products" ON public.products;
-CREATE POLICY "Admin insert products"
-  ON public.products FOR INSERT
-  TO authenticated
-  WITH CHECK (public.is_admin());
-
-DROP POLICY IF EXISTS "Admin update products" ON public.products;
-CREATE POLICY "Admin update products"
-  ON public.products FOR UPDATE
-  TO authenticated
-  USING (public.is_admin())
-  WITH CHECK (public.is_admin());
-
-DROP POLICY IF EXISTS "Admin delete products" ON public.products;
-CREATE POLICY "Admin delete products"
-  ON public.products FOR DELETE
-  TO authenticated
-  USING (public.is_admin());
-
--- 4. Policies for storage.objects
+-- 11. Storage Policies for website-assets
 DROP POLICY IF EXISTS "Public read website assets" ON storage.objects;
-CREATE POLICY "Public read website assets"
-  ON storage.objects FOR SELECT
-  TO anon, authenticated
-  USING (bucket_id = 'website-assets');
+CREATE POLICY "Public read website assets" ON storage.objects FOR SELECT USING (bucket_id = 'website-assets');
 
 DROP POLICY IF EXISTS "Admin upload website assets" ON storage.objects;
-CREATE POLICY "Admin upload website assets"
-  ON storage.objects FOR INSERT
-  TO authenticated
-  WITH CHECK (bucket_id = 'website-assets' AND public.is_admin());
+CREATE POLICY "Admin upload website assets" ON storage.objects FOR INSERT WITH CHECK (bucket_id = 'website-assets' AND public.is_admin());
 
 DROP POLICY IF EXISTS "Admin update website assets" ON storage.objects;
-CREATE POLICY "Admin update website assets"
-  ON storage.objects FOR UPDATE
-  TO authenticated
-  USING (bucket_id = 'website-assets' AND public.is_admin())
-  WITH CHECK (bucket_id = 'website-assets' AND public.is_admin());
+CREATE POLICY "Admin update website assets" ON storage.objects FOR UPDATE USING (bucket_id = 'website-assets' AND public.is_admin());
 
 DROP POLICY IF EXISTS "Admin delete website assets" ON storage.objects;
-CREATE POLICY "Admin delete website assets"
-  ON storage.objects FOR DELETE
-  TO authenticated
-  USING (bucket_id = 'website-assets' AND public.is_admin());
+CREATE POLICY "Admin delete website assets" ON storage.objects FOR DELETE USING (bucket_id = 'website-assets' AND public.is_admin());
+
+-- 12. Pre-seed Owner Emails into Allowlist
+INSERT INTO public.admin_users (email, role, is_active)
+VALUES ('velquarath@gmail.com', 'owner', TRUE)
+ON CONFLICT (email) DO UPDATE SET is_active = TRUE;
+
+INSERT INTO public.admin_users (email, role, is_active)
+VALUES ('codictobi@gmail.com', 'owner', TRUE)
+ON CONFLICT (email) DO UPDATE SET is_active = TRUE;
+
+-- Link any already-created auth users
+UPDATE public.admin_users a
+SET user_id = u.id, updated_at = NOW()
+FROM auth.users u
+WHERE LOWER(a.email) = LOWER(u.email)
+  AND (a.user_id IS NULL OR a.user_id <> u.id)
+  AND a.is_active = TRUE;

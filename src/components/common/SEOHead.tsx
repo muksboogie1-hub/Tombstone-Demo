@@ -4,9 +4,10 @@ import { SITE_CONFIG } from '../../config/siteConfig';
 interface SEOHeadProps {
   title: string;
   description: string;
+  canonicalPath?: string;
 }
 
-export function SEOHead({ title, description }: SEOHeadProps) {
+export function SEOHead({ title, description, canonicalPath }: SEOHeadProps) {
   useEffect(() => {
     const fullTitle = `${title} | ${SITE_CONFIG.brandName}`;
     document.title = fullTitle;

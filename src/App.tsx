@@ -5,7 +5,6 @@ import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
 import { ScrollToTop } from './components/common/ScrollToTop';
 import { BrandedLoadingScreen } from './components/common/BrandedLoadingScreen';
-import { PersistentOfflineNotice } from './components/common/PersistentOfflineNotice';
 
 // Core 15 Pages
 import { HomePage } from './pages/HomePage';
@@ -37,12 +36,12 @@ import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
 
 function AppLayout() {
   const location = useLocation();
-  const { isLoading, retryConnection } = useContent();
+  const { isLoading } = useContent();
   const isAdminRoute = location.pathname.startsWith('/admin');
 
   // If initial load is running and route is public, render branded loading screen
   if (isLoading && !isAdminRoute) {
-    return <BrandedLoadingScreen onRetry={retryConnection} />;
+    return <BrandedLoadingScreen />;
   }
 
   // Admin routes render in their own dedicated portal layout
@@ -55,7 +54,7 @@ function AppLayout() {
     );
   }
 
-  // Public visitor layout
+  // Public visitor layout: completely free of developer diagnostic banners
   return (
     <div className="min-h-screen flex flex-col bg-[#17191B] text-[#F5F1E8]">
       {/* Skip to Main Content Link for Keyboard Accessibility */}
@@ -65,9 +64,6 @@ function AppLayout() {
       >
         Skip to main content
       </a>
-
-      {/* Persistent Offline / Migration Diagnostic Banner */}
-      <PersistentOfflineNotice />
 
       {/* Top Announcement Bar */}
       <DemoBanner />
