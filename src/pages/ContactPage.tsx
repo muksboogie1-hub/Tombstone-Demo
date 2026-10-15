@@ -2,9 +2,12 @@ import { useState } from 'react';
 import { Phone, Mail, MapPin, MessageCircle, Clock, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
 import { SEOHead } from '../components/common/SEOHead';
 import { PageHeader } from '../components/common/PageHeader';
+import { useContent } from '../context/ContentContext';
 import { SITE_CONFIG, getWhatsAppUrl } from '../config/siteConfig';
 
 export function ContactPage() {
+  const { content } = useContent();
+  const contact = content.contact;
   const [name, setName] = useState('');
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [message, setMessage] = useState('');
@@ -122,12 +125,12 @@ export function ContactPage() {
                 Direct instant messaging for photos, design queries, and pricing.
               </p>
               <div className="text-xs text-[#25D366] font-semibold mt-2">
-                {SITE_CONFIG.contact.whatsAppDisplayNumber}
+                {contact?.whatsappDisplay || SITE_CONFIG.contact.whatsAppDisplayNumber}
               </div>
             </div>
             <div className="pt-4">
               <a
-                href={getWhatsAppUrl()}
+                href={contact?.whatsappDigits ? `https://wa.me/${contact.whatsappDigits.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(contact.whatsappGreeting || 'Hello, I would like to enquire about your stonework and memorial services in Zimbabwe.')}` : getWhatsAppUrl()}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#25D366] hover:underline"
@@ -151,7 +154,7 @@ export function ContactPage() {
                 Speak directly with an experienced memorial stonemason.
               </p>
               <div className="text-xs text-[#DFD9CB] font-semibold mt-2">
-                {SITE_CONFIG.contact.telephoneDisplay}
+                {contact?.telephoneDisplay || SITE_CONFIG.contact.telephoneDisplay}
               </div>
             </div>
             <div className="pt-4 text-[11px] text-[#8E8B82]">
@@ -172,7 +175,7 @@ export function ContactPage() {
                 Send architectural floorplans or memorial inscription drafts.
               </p>
               <div className="text-xs text-[#DFD9CB] font-semibold mt-2 truncate">
-                {SITE_CONFIG.contact.email}
+                {contact?.email || SITE_CONFIG.contact.email}
               </div>
             </div>
             <div className="pt-4 text-[11px] text-[#8E8B82]">
@@ -190,14 +193,14 @@ export function ContactPage() {
                 Consultation Hours
               </h3>
               <p className="text-xs text-[#B9B5AC] mt-1">
-                {SITE_CONFIG.contact.operatingHours}
+                {contact?.operatingHours || SITE_CONFIG.contact.operatingHours}
               </p>
               <div className="text-[11px] text-[#DFD9CB] mt-2">
                 Sunday: By appointment only for unveilings
               </div>
             </div>
             <div className="pt-4 text-[11px] text-[#8E8B82]">
-              Nationwide Zimbabwe delivery
+              {contact?.serviceArea || "Nationwide Zimbabwe delivery"}
             </div>
           </div>
         </div>
@@ -216,7 +219,7 @@ export function ContactPage() {
             </h3>
 
             <p className="text-xs sm:text-sm text-[#B9B5AC] leading-relaxed">
-              {SITE_CONFIG.contact.physicalAddress}, {SITE_CONFIG.contact.city}, {SITE_CONFIG.contact.country}.
+              {contact ? `${contact.physicalAddress}, ${contact.city}, ${contact.country}.` : `${SITE_CONFIG.contact.physicalAddress}, ${SITE_CONFIG.contact.city}, ${SITE_CONFIG.contact.country}.`}
             </p>
 
             <div className="bg-[#17191B] p-4 rounded border border-[#252A2E] space-y-2 text-xs text-[#DFD9CB]">

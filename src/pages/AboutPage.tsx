@@ -1,10 +1,18 @@
 import { Link } from 'react-router-dom';
-import { Shield, Sparkles, HeartHandshake, Eye, MapPin, ArrowRight } from 'lucide-react';
+import { Shield, Sparkles, HeartHandshake, MapPin, ArrowRight } from 'lucide-react';
 import { SEOHead } from '../components/common/SEOHead';
 import { PageHeader } from '../components/common/PageHeader';
+import { useContent } from '../context/ContentContext';
 import { SITE_CONFIG, getWhatsAppUrl } from '../config/siteConfig';
 
 export function AboutPage() {
+  const { content } = useContent();
+  const about = content.about;
+
+  const customWhatsAppUrl = content?.contact?.whatsappDigits
+    ? `https://wa.me/${content.contact.whatsappDigits.replace(/[^0-9]/g, '')}?text=${encodeURIComponent('Hello, I would like to learn more about your stone sourcing and custom memorial fabrication.')}`
+    : getWhatsAppUrl("Hello, I would like to learn more about your stone sourcing and custom memorial fabrication.");
+
   return (
     <div className="space-y-20 pb-20">
       <SEOHead
@@ -13,8 +21,8 @@ export function AboutPage() {
       />
 
       <PageHeader
-        title="Crafted in Stone. Remembered Forever."
-        subtitle="A design-led approach to memorial masonry and architectural stonework in Zimbabwe. Blending natural geology, patient stonemasonry, and dignified digital presentation."
+        title={about?.title || "Crafted in Stone. Remembered Forever."}
+        subtitle={about?.subtitle || "A design-led approach to memorial masonry and architectural stonework in Zimbabwe. Blending natural geology, patient stonemasonry, and dignified digital presentation."}
         category="Our Philosophy & Concept"
         breadcrumbs={[{ label: 'About' }]}
       />
@@ -25,27 +33,27 @@ export function AboutPage() {
           <div className="space-y-6">
             <div className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-[#B79A68] font-semibold">
               <Sparkles className="w-4 h-4" />
-              <span>The Stonework Philosophy</span>
+              <span>{about?.philosophyBadge || "The Stonework Philosophy"}</span>
             </div>
 
             <h2 className="font-serif text-3xl sm:text-4xl text-[#F5F1E8] font-bold leading-tight">
-              Honoring Memory Through Enduring Geology
+              {about?.philosophyTitle || "Honoring Memory Through Enduring Geology"}
             </h2>
 
             <p className="text-sm sm:text-base text-[#DFD9CB] leading-relaxed font-light">
-              Stonemasonry is not merely the cutting of rock; it is the physical anchoring of memory. When a family chooses a memorial for a loved one, they are making a commitment that will stand under African sun and seasonal rains for decades.
+              {about?.philosophyP1 || "Stonemasonry is not merely the cutting of rock; it is the physical anchoring of memory. When a family chooses a memorial for a loved one, they are making a commitment that will stand under African sun and seasonal rains for decades."}
             </p>
 
             <p className="text-sm text-[#B9B5AC] leading-relaxed">
-              Zimbabwe Black Granite is revered across the globe as one of the densest, most uniform, and deeply lustrous natural stones on Earth. Its high quartz and feldspar composition provides extraordinary weather resistance, ensuring that carved inscriptions remain legible across generations.
+              {about?.philosophyP2 || "Zimbabwe Black Granite is revered across the globe as one of the densest, most uniform, and deeply lustrous natural stones on Earth. Its high quartz and feldspar composition provides extraordinary weather resistance, ensuring that carved inscriptions remain legible across generations."}
             </p>
 
             <div className="pt-2">
               <a
-                href={getWhatsAppUrl("Hello, I would like to learn more about your stone sourcing and custom memorial fabrication.")}
+                href={customWhatsAppUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest bg-[#B79A68] hover:bg-[#CBB17F] text-[#17191B] px-6 py-3 rounded transition-colors"
+                className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest bg-[#B79A68] hover:bg-[#CBB17F] text-[#17191B] px-6 py-3 rounded transition-colors cursor-pointer"
               >
                 <span>Consult Our Specialists</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -75,25 +83,24 @@ export function AboutPage() {
         <section className="bg-[#1D2023] border border-[#B79A68]/40 p-8 sm:p-12 rounded-lg space-y-6">
           <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-[#B79A68] font-semibold">
             <Shield className="w-4 h-4" />
-            <span>Masonry Standards & Material Integrity</span>
+            <span>{about?.standardsBadge || "Masonry Standards & Material Integrity"}</span>
           </div>
 
           <h3 className="font-serif text-2xl sm:text-3xl text-[#F5F1E8] font-bold">
-            Our Commitment to Enduring Craft
+            {about?.standardsTitle || "Our Commitment to Enduring Craft"}
           </h3>
 
           <div className="space-y-4 text-xs sm:text-sm text-[#B9B5AC] leading-relaxed">
             <p>
-              At <strong className="text-[#F5F1E8]">Velquarath Stoneworks</strong>, we believe every memorial and architectural slab should stand as a permanent testament to craftsmanship, dignity, and family heritage.
-            </p>
-            <p>
-              Our fabrication philosophy is guided by strict material integrity and respectful service:
+              {about?.standardsIntro || (
+                <>At <strong className="text-[#F5F1E8]">Velquarath Stoneworks</strong>, we believe every memorial and architectural slab should stand as a permanent testament to craftsmanship, dignity, and family heritage.</>
+              )}
             </p>
             <ul className="list-disc pl-5 space-y-2 text-[#DFD9CB]">
-              <li><strong className="text-[#F5F1E8]">Solid Geological Stone:</strong> We work exclusively with solid Zimbabwean Black Granite and premium natural stone. We never utilize resin imitations, hollow veneers, or composite fillers.</li>
-              <li><strong className="text-[#F5F1E8]">Custom Inscription Artistry:</strong> Traditional hand-lettering, sandblasting, and 24-carat gold leaf gilding in English, Shona, and Ndebele, crafted to family and cemetery standards.</li>
-              <li><strong className="text-[#F5F1E8]">Cemetery Bylaw Alignment:</strong> Dimensions, base plinths, and headstone elevations are verified against municipal and private cemetery regulations across Zimbabwe prior to cutting.</li>
-              <li><strong className="text-[#F5F1E8]">Nationwide Delivery & Installation:</strong> Experienced stonemasons oversee foundation preparation and level ground erection across Harare, Bulawayo, Mutare, and regional rural family lands.</li>
+              <li><strong className="text-[#F5F1E8]">Solid Geological Stone:</strong> {about?.standardsPoint1 || "We work exclusively with solid Zimbabwean Black Granite and premium natural stone. We never utilize resin imitations, hollow veneers, or composite fillers."}</li>
+              <li><strong className="text-[#F5F1E8]">Custom Inscription Artistry:</strong> {about?.standardsPoint2 || "Traditional hand-lettering, sandblasting, and 24-carat gold leaf gilding in English, Shona, and Ndebele, crafted to family and cemetery standards."}</li>
+              <li><strong className="text-[#F5F1E8]">Cemetery Bylaw Alignment:</strong> {about?.standardsPoint3 || "Dimensions, base plinths, and headstone elevations are verified against municipal and private cemetery regulations across Zimbabwe prior to cutting."}</li>
+              <li><strong className="text-[#F5F1E8]">Nationwide Delivery & Installation:</strong> {about?.standardsPoint4 || "Experienced stonemasons oversee foundation preparation and level ground erection across Harare, Bulawayo, Mutare, and regional rural family lands."}</li>
             </ul>
           </div>
 
@@ -160,7 +167,7 @@ export function AboutPage() {
               <span>Target Service Region</span>
             </div>
             <h3 className="font-serif text-xl sm:text-2xl text-[#F5F1E8] font-bold">
-              Harare, Bulawayo & Nationwide Zimbabwe
+              {content?.contact?.serviceArea || "Harare, Bulawayo & Nationwide Zimbabwe"}
             </h3>
             <p className="text-xs text-[#B9B5AC] max-w-xl leading-relaxed">
               Serving family burial parks across Harare (Warren Hills, Granville, Glen Forest, Greendale) and Bulawayo (Luveve, West Park, Athlone), with specialized crated delivery for regional provinces.

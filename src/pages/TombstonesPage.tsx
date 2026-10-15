@@ -5,12 +5,14 @@ import { SEOHead } from '../components/common/SEOHead';
 import { PageHeader } from '../components/common/PageHeader';
 import { ProductCard } from '../components/common/ProductCard';
 import { ProductDetailModal } from '../components/common/ProductDetailModal';
-import { PRODUCTS, Product } from '../data/products';
+import { useContent } from '../context/ContentContext';
+import { Product } from '../types/content';
 import { getWhatsAppUrl } from '../config/siteConfig';
 
 export function TombstonesPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const tombstones = PRODUCTS.filter((p) => p.category === 'Tombstones');
+  const { products } = useContent();
+  const tombstones = products.filter((p) => p.category === 'Tombstones' && p.isPublished !== false);
 
   return (
     <div className="space-y-16 pb-20">

@@ -1,5 +1,5 @@
 import { Eye, MessageCircle, ExternalLink } from 'lucide-react';
-import { Product } from '../../data/products';
+import { Product } from '../../types/content';
 import { getProductWhatsAppUrl } from '../../config/siteConfig';
 
 interface ProductCardProps {
@@ -8,6 +8,14 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, onSelect }: ProductCardProps) {
+  // Format subtle price indicator if present
+  let priceBadge: string | null = null;
+  if (product.priceDisplayMode === 'starting_from' && product.priceAmount) {
+    priceBadge = `From $${product.priceAmount.toFixed(0)} ${product.priceCurrency || 'USD'}`;
+  } else if (product.priceDisplayMode === 'fixed_price' && product.priceAmount) {
+    priceBadge = `$${product.priceAmount.toFixed(0)} ${product.priceCurrency || 'USD'}`;
+  }
+
   return (
     <article className="bg-[#1D2023] border border-[#2D3237] hover:border-[#B79A68]/50 transition-all duration-300 rounded overflow-hidden flex flex-col group">
       {/* Product Image Frame */}
@@ -36,11 +44,18 @@ export function ProductCard({ product, onSelect }: ProductCardProps) {
       {/* Card Body */}
       <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
         <div>
-          {/* Category Metadata (No static pill enclosure; clean unboxed typography) */}
-          <div className="flex items-center gap-2 text-[11px] text-[#B79A68] tracking-widest uppercase font-semibold mb-1.5">
-            <span>{product.category}</span>
-            <span aria-hidden="true" className="text-[#3D434A]">·</span>
-            <span className="text-[#8E8B82]">Zimbabwe Granite</span>
+          {/* Category Metadata */}
+          <div className="flex items-center justify-between text-[11px] mb-1.5">
+            <div className="flex items-center gap-2 text-[#B79A68] tracking-widest uppercase font-semibold">
+              <span>{product.category}</span>
+              <span aria-hidden="true" className="text-[#3D434A]">·</span>
+              <span className="text-[#8E8B82]">Zimbabwe Granite</span>
+            </div>
+            {priceBadge && (
+              <span className="text-[#DFD9CB] font-mono text-[10px] bg-[#17191B] px-2 py-0.5 rounded border border-[#3D434A]">
+                {priceBadge}
+              </span>
+            )}
           </div>
 
           <h3 className="font-serif text-lg text-[#F5F1E8] font-bold group-hover:text-[#B79A68] transition-colors leading-snug">
@@ -52,7 +67,7 @@ export function ProductCard({ product, onSelect }: ProductCardProps) {
           </p>
         </div>
 
-        {/* Action Controls */}
+        {/* Action Controls (Preserving View Design and WhatsApp Enquire) */}
         <div className="pt-3 border-t border-[#252A2E] flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <button
             type="button"

@@ -4,14 +4,25 @@ import { ArrowRight, MessageCircle, FileText, Compass, Sparkles, CheckCircle2 } 
 import { SEOHead } from '../components/common/SEOHead';
 import { ProductCard } from '../components/common/ProductCard';
 import { ProductDetailModal } from '../components/common/ProductDetailModal';
-import { PRODUCTS, Product } from '../data/products';
+import { useContent } from '../context/ContentContext';
+import { Product } from '../types/content';
 import { SITE_CONFIG, getWhatsAppUrl } from '../config/siteConfig';
 
 export function HomePage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const { content, products } = useContent();
 
-  // Curated featured designs
-  const featuredProducts = PRODUCTS.filter((p) => p.featured).slice(0, 6);
+  const hero = content.hero;
+  const categories = content.categories;
+
+  // Curated featured designs from live database or verified baseline
+  const activeProducts = products.filter((p) => p.isPublished !== false);
+  const featured = activeProducts.filter((p) => p.featured);
+  const featuredProducts = featured.length > 0 ? featured.slice(0, 6) : activeProducts.slice(0, 6);
+
+  const customWhatsAppUrl = content?.contact?.whatsappDigits
+    ? `https://wa.me/${content.contact.whatsappDigits.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(content.contact.whatsappGreeting || 'Hello, I would like to enquire about your stonework and memorial services in Zimbabwe.')}`
+    : getWhatsAppUrl();
 
   return (
     <div className="space-y-24 sm:space-y-32">
@@ -38,21 +49,19 @@ export function HomePage() {
         <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-8">
           {/* Subtle Badge */}
           <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-[#B79A68] border border-[#B79A68]/30 px-3.5 py-1.5 rounded-full bg-[#17191B]/80 backdrop-blur-xs">
-            <span>Artisanal Stonemasonry</span>
-            <span aria-hidden="true">·</span>
-            <span>Zimbabwe</span>
+            <span>{hero?.badge || 'Artisanal Stonemasonry · Zimbabwe'}</span>
           </div>
 
           <h1 className="font-serif text-4xl sm:text-6xl md:text-7xl font-bold text-[#F5F1E8] tracking-tight leading-[1.08] max-w-4xl mx-auto">
-            Stone That Speaks Beyond Time.
+            {hero?.title || 'Stone That Speaks Beyond Time.'}
           </h1>
 
           <p className="text-base sm:text-lg md:text-xl text-[#DFD9CB] max-w-2xl mx-auto font-light leading-relaxed">
-            Bespoke Zimbabwean black granite memorials, custom tombstone craft, and precision-cut architectural stonework.
+            {hero?.subtitle || 'Bespoke Zimbabwean black granite memorials, custom tombstone craft, and precision-cut architectural stonework.'}
           </p>
 
           <p className="text-xs text-[#B9B5AC] max-w-lg mx-auto">
-            Every memorial, countertop, and window sill is custom-crafted to your family or architectural specifications with nationwide delivery and cemetery installation.
+            {hero?.description || 'Every memorial, countertop, and window sill is custom-crafted to your family or architectural specifications with nationwide delivery and cemetery installation.'}
           </p>
 
           {/* Action Button Row */}
@@ -61,7 +70,7 @@ export function HomePage() {
               to="/gallery"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-widest bg-[#B79A68] hover:bg-[#CBB17F] text-[#17191B] px-8 py-3.5 rounded transition-all shadow-lg hover:shadow-[#B79A68]/20 cursor-pointer"
             >
-              <span>Explore Our Gallery</span>
+              <span>{hero?.primaryButtonText || 'Explore Our Gallery'}</span>
               <ArrowRight className="w-4 h-4" />
             </Link>
 
@@ -70,18 +79,18 @@ export function HomePage() {
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-widest text-[#F5F1E8] hover:text-[#B79A68] bg-[#1D2023]/90 hover:bg-[#252A2E] border border-[#3D434A] hover:border-[#B79A68]/50 px-8 py-3.5 rounded transition-colors cursor-pointer"
             >
               <FileText className="w-4 h-4 text-[#B79A68]" />
-              <span>Request a Quote</span>
+              <span>{hero?.secondaryButtonText || 'Request a Quote'}</span>
             </Link>
 
             <a
-              href={getWhatsAppUrl()}
+              href={customWhatsAppUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-widest text-[#25D366] hover:text-white bg-[#25D366]/15 hover:bg-[#25D366] border border-[#25D366]/40 px-6 py-3.5 rounded transition-colors cursor-pointer"
               title="Open WhatsApp chat"
             >
               <MessageCircle className="w-4 h-4" />
-              <span>Chat on WhatsApp</span>
+              <span>{hero?.whatsappButtonText || 'Chat on WhatsApp'}</span>
             </a>
           </div>
         </div>
@@ -92,10 +101,10 @@ export function HomePage() {
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-[#2D3237] pb-6">
           <div>
             <div className="text-xs uppercase tracking-[0.2em] font-semibold text-[#B79A68] mb-1">
-              Stone Masonry Disciplines
+              {categories?.badge || 'Stone Masonry Disciplines'}
             </div>
             <h2 id="featured-categories-heading" className="font-serif text-3xl sm:text-4xl text-[#F5F1E8] font-bold">
-              Featured Categories
+              {categories?.title || 'Featured Categories'}
             </h2>
           </div>
           <p className="text-xs sm:text-sm text-[#B9B5AC] max-w-md">
@@ -122,10 +131,10 @@ export function HomePage() {
                   Memorial Work
                 </span>
                 <h3 className="font-serif text-xl sm:text-2xl text-[#F5F1E8] font-bold group-hover:text-[#B79A68] transition-colors">
-                  Tombstones & Memorials
+                  {categories?.tombstonesHeading || 'Tombstones & Memorials'}
                 </h3>
                 <p className="text-xs text-[#B9B5AC] mt-2 leading-relaxed">
-                  Headstones, full kerb enclosures, tiered ledger stones, and cross memorials carved in deep Zimbabwean granite to honor family legacies.
+                  {categories?.tombstonesDescription || 'Headstones, full kerb enclosures, tiered ledger stones, and cross memorials carved in deep Zimbabwean granite to honor family legacies.'}
                 </p>
               </div>
 
@@ -159,10 +168,10 @@ export function HomePage() {
                   Interior & Living
                 </span>
                 <h3 className="font-serif text-xl sm:text-2xl text-[#F5F1E8] font-bold group-hover:text-[#B79A68] transition-colors">
-                  Countertops & Tables
+                  {categories?.countertopsHeading || 'Countertops & Tables'}
                 </h3>
                 <p className="text-xs text-[#B9B5AC] mt-2 leading-relaxed">
-                  Heat-resistant granite kitchen worktops, waterfall edge islands, bathroom vanity slabs, and solid stone outdoor dining tables.
+                  {categories?.countertopsDescription || 'Heat-resistant granite kitchen worktops, waterfall edge islands, bathroom vanity slabs, and solid stone outdoor dining tables.'}
                 </p>
               </div>
 
@@ -196,10 +205,10 @@ export function HomePage() {
                   Architectural Masonry
                 </span>
                 <h3 className="font-serif text-xl sm:text-2xl text-[#F5F1E8] font-bold group-hover:text-[#B79A68] transition-colors">
-                  Window Sills
+                  {categories?.windowSillsHeading || 'Window Sills'}
                 </h3>
                 <p className="text-xs text-[#B9B5AC] mt-2 leading-relaxed">
-                  Durable granite exterior sills with water-drip grooves, honed interior threshold reveals, and bullnose architectural trim.
+                  {categories?.windowSillsDescription || 'Durable granite exterior sills with water-drip grooves, honed interior threshold reveals, and bullnose architectural trim.'}
                 </p>
               </div>
 
@@ -232,7 +241,7 @@ export function HomePage() {
             to="/gallery"
             className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-[#B79A68] hover:text-[#F5F1E8] transition-colors"
           >
-            <span>View Complete Gallery ({PRODUCTS.length} Designs)</span>
+            <span>View Complete Gallery ({activeProducts.length} Designs)</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </Link>
         </div>
@@ -361,13 +370,13 @@ export function HomePage() {
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
             <a
-              href={getWhatsAppUrl()}
+              href={customWhatsAppUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 text-xs font-semibold uppercase tracking-wider bg-[#25D366] hover:bg-[#20BA5A] text-[#121415] px-7 py-3.5 rounded transition-colors shadow-md cursor-pointer"
             >
               <MessageCircle className="w-4 h-4" />
-              <span>Chat via WhatsApp ({SITE_CONFIG.contact.whatsAppDisplayNumber})</span>
+              <span>Chat via WhatsApp ({content?.contact?.whatsappDisplay || SITE_CONFIG.contact.whatsAppDisplayNumber})</span>
             </a>
 
             <Link
@@ -380,9 +389,9 @@ export function HomePage() {
           </div>
 
           <div className="pt-4 text-[11px] text-[#8E8B82]">
-            <span>Business Hours: {SITE_CONFIG.contact.operatingHours}</span>
+            <span>Business Hours: {content?.contact?.operatingHours || SITE_CONFIG.contact.operatingHours}</span>
             <span className="mx-2">·</span>
-            <span>Direct Email: {SITE_CONFIG.contact.email}</span>
+            <span>Direct Email: {content?.contact?.email || SITE_CONFIG.contact.email}</span>
           </div>
         </div>
       </section>

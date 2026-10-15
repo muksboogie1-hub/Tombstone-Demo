@@ -5,14 +5,17 @@ import { SEOHead } from '../components/common/SEOHead';
 import { PageHeader } from '../components/common/PageHeader';
 import { ProductCard } from '../components/common/ProductCard';
 import { ProductDetailModal } from '../components/common/ProductDetailModal';
-import { PRODUCTS, Product } from '../data/products';
+import { useContent } from '../context/ContentContext';
+import { Product } from '../types/content';
 
 export function ProductsPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const { products } = useContent();
 
-  const tombstones = PRODUCTS.filter((p) => p.category === 'Tombstones');
-  const countertops = PRODUCTS.filter((p) => p.category === 'Countertops & Tables');
-  const windowSills = PRODUCTS.filter((p) => p.category === 'Window Sills');
+  const active = products.filter((p) => p.isPublished !== false);
+  const tombstones = active.filter((p) => p.category === 'Tombstones');
+  const countertops = active.filter((p) => p.category === 'Countertops & Tables');
+  const windowSills = active.filter((p) => p.category === 'Window Sills');
 
   return (
     <div className="space-y-20 pb-20">

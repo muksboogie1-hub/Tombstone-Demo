@@ -4,12 +4,14 @@ import { Eye, MessageCircle, ExternalLink, SlidersHorizontal, Check } from 'luci
 import { SEOHead } from '../components/common/SEOHead';
 import { PageHeader } from '../components/common/PageHeader';
 import { ProductDetailModal } from '../components/common/ProductDetailModal';
-import { PRODUCTS, Product } from '../data/products';
+import { useContent } from '../context/ContentContext';
+import { Product } from '../types/content';
 import { getProductWhatsAppUrl } from '../config/siteConfig';
 
 type CategoryFilter = 'All Designs' | 'Tombstones' | 'Countertops & Tables' | 'Window Sills';
 
 export function GalleryPage() {
+  const { products, content } = useContent();
   const [searchParams, setSearchParams] = useSearchParams();
   const initialCategory = (searchParams.get('category') as CategoryFilter) || 'All Designs';
   
@@ -19,6 +21,8 @@ export function GalleryPage() {
       : 'All Designs'
   );
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+
+  const activeProducts = products.filter((p) => p.isPublished !== false);
 
   const filters: CategoryFilter[] = [
     'All Designs',
@@ -38,9 +42,9 @@ export function GalleryPage() {
   };
 
   const filteredProducts = useMemo(() => {
-    if (activeFilter === 'All Designs') return PRODUCTS;
-    return PRODUCTS.filter((p) => p.category === activeFilter);
-  }, [activeFilter]);
+    if (activeFilter === 'All Designs') return activeProducts;
+    return activeProducts.filter((p) => p.category === activeFilter);
+  }, [activeFilter, activeProducts]);
 
   return (
     <div className="space-y-12 pb-20">
@@ -69,8 +73,8 @@ export function GalleryPage() {
               const isActive = activeFilter === filter;
               const count =
                 filter === 'All Designs'
-                  ? PRODUCTS.length
-                  : PRODUCTS.filter((p) => p.category === filter).length;
+                  ? activeProducts.length
+                  : activeProducts.filter((p) => p.category === filter).length;
 
               return (
                 <button

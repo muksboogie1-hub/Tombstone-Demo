@@ -1,8 +1,11 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { ContentProvider, useContent } from './context/ContentContext';
 import { DemoBanner } from './components/layout/DemoBanner';
 import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
 import { ScrollToTop } from './components/common/ScrollToTop';
+import { BrandedLoadingScreen } from './components/common/BrandedLoadingScreen';
+import { PersistentOfflineNotice } from './components/common/PersistentOfflineNotice';
 
 // Core 15 Pages
 import { HomePage } from './pages/HomePage';
@@ -28,10 +31,33 @@ import { SecurityAndPrelaunchPage } from './pages/compliance/SecurityAndPrelaunc
 import { GoogleIndexingPage } from './pages/compliance/GoogleIndexingPage';
 import { ProductionHandoverPage } from './pages/compliance/ProductionHandoverPage';
 
-export function App() {
+// Administrator Portal
+import { AdminLoginPage } from './pages/admin/AdminLoginPage';
+import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
+
+function AppLayout() {
+  const location = useLocation();
+  const { isLoading, retryConnection } = useContent();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+
+  // If initial load is running and route is public, render branded loading screen
+  if (isLoading && !isAdminRoute) {
+    return <BrandedLoadingScreen onRetry={retryConnection} />;
+  }
+
+  // Admin routes render in their own dedicated portal layout
+  if (isAdminRoute) {
+    return (
+      <Routes>
+        <Route path="/admin" element={<AdminDashboardPage />} />
+        <Route path="/admin/login" element={<AdminLoginPage />} />
+      </Routes>
+    );
+  }
+
+  // Public visitor layout
   return (
-    <BrowserRouter>
-      <ScrollToTop />
+    <div className="min-h-screen flex flex-col bg-[#17191B] text-[#F5F1E8]">
       {/* Skip to Main Content Link for Keyboard Accessibility */}
       <a
         href="#main-content"
@@ -40,48 +66,60 @@ export function App() {
         Skip to main content
       </a>
 
-      <div className="min-h-screen flex flex-col bg-[#17191B] text-[#F5F1E8]">
-        {/* Top Announcement Bar */}
-        <DemoBanner />
+      {/* Persistent Offline / Migration Diagnostic Banner */}
+      <PersistentOfflineNotice />
 
-        {/* Primary Navigation */}
-        <Navbar />
+      {/* Top Announcement Bar */}
+      <DemoBanner />
 
-        {/* Main Routed View */}
-        <main id="main-content" className="flex-1">
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/products" element={<ProductsPage />} />
-            <Route path="/tombstones" element={<TombstonesPage />} />
-            <Route path="/countertops-tables" element={<CountertopsPage />} />
-            <Route path="/window-sills" element={<WindowSillsPage />} />
-            <Route path="/gallery" element={<GalleryPage />} />
-            <Route path="/about" element={<AboutPage />} />
-            <Route path="/request-a-quote" element={<RequestQuotePage />} />
-            <Route path="/contact" element={<ContactPage />} />
+      {/* Primary Navigation */}
+      <Navbar />
 
-            {/* Legal & Policy Pages */}
-            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-            <Route path="/cookie-policy" element={<CookiePolicyPage />} />
-            <Route path="/terms-and-conditions" element={<TermsConditionsPage />} />
-            <Route path="/refund-policy" element={<RefundPolicyPage />} />
-            <Route path="/accessibility-statement" element={<AccessibilityStatementPage />} />
+      {/* Main Routed View */}
+      <main id="main-content" className="flex-1">
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/products" element={<ProductsPage />} />
+          <Route path="/tombstones" element={<TombstonesPage />} />
+          <Route path="/countertops-tables" element={<CountertopsPage />} />
+          <Route path="/window-sills" element={<WindowSillsPage />} />
+          <Route path="/gallery" element={<GalleryPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/request-a-quote" element={<RequestQuotePage />} />
+          <Route path="/contact" element={<ContactPage />} />
 
-            {/* Compliance, SEO & Handover Hub */}
-            <Route path="/compliance/zimbabwe-legal-review" element={<ZimbabweLegalReviewPage />} />
-            <Route path="/compliance/image-licenses" element={<ImageLicensesPage />} />
-            <Route path="/compliance/security-and-prelaunch" element={<SecurityAndPrelaunchPage />} />
-            <Route path="/compliance/google-indexing" element={<GoogleIndexingPage />} />
-            <Route path="/compliance/production-handover" element={<ProductionHandoverPage />} />
+          {/* Legal & Policy Pages */}
+          <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+          <Route path="/cookie-policy" element={<CookiePolicyPage />} />
+          <Route path="/terms-and-conditions" element={<TermsConditionsPage />} />
+          <Route path="/refund-policy" element={<RefundPolicyPage />} />
+          <Route path="/accessibility-statement" element={<AccessibilityStatementPage />} />
 
-            {/* 404 Route */}
-            <Route path="*" element={<NotFoundPage />} />
-          </Routes>
-        </main>
+          {/* Compliance, SEO & Handover Hub */}
+          <Route path="/compliance/zimbabwe-legal-review" element={<ZimbabweLegalReviewPage />} />
+          <Route path="/compliance/image-licenses" element={<ImageLicensesPage />} />
+          <Route path="/compliance/security-and-prelaunch" element={<SecurityAndPrelaunchPage />} />
+          <Route path="/compliance/google-indexing" element={<GoogleIndexingPage />} />
+          <Route path="/compliance/production-handover" element={<ProductionHandoverPage />} />
 
-        {/* Global Footer */}
-        <Footer />
-      </div>
+          {/* 404 Route */}
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+      </main>
+
+      {/* Global Footer (Preserving Client Assurance & Standards) */}
+      <Footer />
+    </div>
+  );
+}
+
+export function App() {
+  return (
+    <BrowserRouter>
+      <ScrollToTop />
+      <ContentProvider>
+        <AppLayout />
+      </ContentProvider>
     </BrowserRouter>
   );
 }

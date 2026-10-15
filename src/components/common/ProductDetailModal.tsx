@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { X, MessageCircle, FileText, Info, ExternalLink } from 'lucide-react';
-import { Product } from '../../data/products';
+import { X, MessageCircle, FileText, Info, ExternalLink, Tag } from 'lucide-react';
+import { Product } from '../../types/content';
 import { getProductWhatsAppUrl } from '../../config/siteConfig';
 
 interface ProductDetailModalProps {
@@ -37,6 +37,16 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
 
   if (!product) return null;
 
+  // Render pricing display
+  let pricingText = 'Quotation Upon Stone Selection & Site Dimensions';
+  if (product.priceDisplayMode === 'starting_from' && product.priceAmount) {
+    pricingText = `From $${product.priceAmount.toFixed(2)} ${product.priceCurrency || 'USD'} ${product.priceNote ? `(${product.priceNote})` : ''}`;
+  } else if (product.priceDisplayMode === 'fixed_price' && product.priceAmount) {
+    pricingText = `$${product.priceAmount.toFixed(2)} ${product.priceCurrency || 'USD'} ${product.priceNote ? `(${product.priceNote})` : ''}`;
+  } else if (product.priceNote) {
+    pricingText = product.priceNote;
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
@@ -68,9 +78,11 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
             loading="eager"
             className="w-full h-full object-cover object-center max-h-[460px] md:max-h-none"
           />
-          <div className="absolute bottom-2 left-2 bg-[#17191B]/90 backdrop-blur-xs text-[10px] text-[#B9B5AC] px-2.5 py-1 rounded border border-[#2D3237]">
-            Photo: {product.imageAttribution.photographer} ({product.imageAttribution.license})
-          </div>
+          {product.imageAttribution?.photographer && (
+            <div className="absolute bottom-2 left-2 bg-[#17191B]/90 backdrop-blur-xs text-[10px] text-[#B9B5AC] px-2.5 py-1 rounded border border-[#2D3237]">
+              Photo: {product.imageAttribution.photographer} ({product.imageAttribution.license})
+            </div>
+          )}
         </div>
 
         {/* Content Column */}
@@ -87,6 +99,12 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
               {product.name}
             </h2>
 
+            {/* Pricing Guidance Display */}
+            <div className="inline-flex items-center gap-2 bg-[#17191B] border border-[#B79A68]/40 px-3 py-1.5 rounded text-xs">
+              <Tag className="w-3.5 h-3.5 text-[#B79A68]" />
+              <span className="text-[#DFD9CB] font-semibold">{pricingText}</span>
+            </div>
+
             <p id="product-modal-desc" className="text-sm text-[#DFD9CB] leading-relaxed">
               {product.longDescription}
             </p>
@@ -101,13 +119,13 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
               <div className="grid grid-cols-1 gap-2 pt-1 text-[#B9B5AC]">
                 <div>
                   <span className="text-[#DFD9CB] font-medium">Stone Options:</span>{' '}
-                  {product.specifications.materialOptions}
+                  {product.specifications?.materialOptions || 'Zimbabwe Black Granite'}
                 </div>
                 <div>
                   <span className="text-[#DFD9CB] font-medium">Surface Finish:</span>{' '}
-                  {product.specifications.finish}
+                  {product.specifications?.finish || 'Polished face'}
                 </div>
-                {product.specifications.edgeProfile && (
+                {product.specifications?.edgeProfile && (
                   <div>
                     <span className="text-[#DFD9CB] font-medium">Edge Profile:</span>{' '}
                     {product.specifications.edgeProfile}
@@ -115,15 +133,17 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
                 )}
                 <div className="text-[11px] text-[#8E8B82] pt-1 border-t border-[#252A2E]">
                   <span className="text-[#DFD9CB] font-medium">Dimensions & Sizing:</span>{' '}
-                  {product.specifications.sizingNote}
+                  {product.specifications?.sizingNote || 'Custom sizing available'}
                 </div>
               </div>
             </div>
 
             {/* Copyright & License Note */}
-            <div className="text-[11px] text-[#8E8B82] bg-[#17191B]/50 p-2.5 rounded border border-[#252A2E]">
-              <span className="font-medium text-[#B9B5AC]">Image Rights Verified:</span> Sourced from {product.imageAttribution.source} under {product.imageAttribution.license}. {product.imageAttribution.modifications}.
-            </div>
+            {product.imageAttribution?.source && (
+              <div className="text-[11px] text-[#8E8B82] bg-[#17191B]/50 p-2.5 rounded border border-[#252A2E]">
+                <span className="font-medium text-[#B9B5AC]">Image Rights Verified:</span> Sourced from {product.imageAttribution.source} under {product.imageAttribution.license}.
+              </div>
+            )}
           </div>
 
           {/* Action Buttons */}
