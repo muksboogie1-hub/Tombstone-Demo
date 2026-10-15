@@ -4,7 +4,7 @@ import { DEFAULT_WEBSITE_CONTENT } from '../data/defaultContent';
 import { PRODUCTS as BASELINE_PRODUCTS } from '../data/products';
 import { fetchWebsiteContent, saveContentSection, resetContentSection as apiResetSection } from '../services/contentService';
 import { fetchProducts } from '../services/productService';
-import { isSupabaseConfigured } from '../lib/supabaseClient';
+import { isSupabaseConfigured, reinitializeClient, getSupabaseConfig } from '../lib/supabaseClient';
 
 interface ContentContextValue {
   content: WebsiteContent;
@@ -15,6 +15,7 @@ interface ContentContextValue {
   isEmptyProductsTable: boolean;
   isConfigured: boolean;
   lastError: string | null;
+  configSource?: 'build_env' | 'window_env' | 'local_storage';
   retryConnection: () => Promise<void>;
   updateContentSection: (section: keyof WebsiteContent, value: any) => Promise<boolean>;
   resetContentSection: (section: keyof WebsiteContent) => Promise<boolean>;
@@ -24,7 +25,7 @@ interface ContentContextValue {
 
 const ContentContext = createContext<ContentContextValue | undefined>(undefined);
 
-const BOUNDED_TIMEOUT_MS = 3500;
+const BOUNDED_TIMEOUT_MS = 4000;
 
 export function ContentProvider({ children }: { children: ReactNode }) {
   const [content, setContent] = useState<WebsiteContent>(DEFAULT_WEBSITE_CONTENT);
@@ -32,24 +33,32 @@ export function ContentProvider({ children }: { children: ReactNode }) {
 
   // Determine if current route is an admin route that should bypass public loading screen
   const isAdminRoute = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
-
   const [isLoading, setIsLoading] = useState(!isAdminRoute);
   const [isOffline, setIsOffline] = useState(false);
   const [isMissingTables, setIsMissingTables] = useState(false);
   const [isEmptyProductsTable, setIsEmptyProductsTable] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
-
-  const configured = isSupabaseConfigured();
+  const [isConfigured, setIsConfigured] = useState(() => isSupabaseConfigured());
+  const [configSource, setConfigSource] = useState<'build_env' | 'window_env' | 'local_storage' | undefined>(
+    () => getSupabaseConfig()?.source
+  );
 
   /**
-   * Dual-Resource Loader with Bounded Timeout & Error Segregation
+   * Dual-Resource Loader with Bounded Timeout & Genuine Error Reporting
    */
   const loadInitialData = useCallback(async () => {
-    if (!configured) {
+    const config = getSupabaseConfig();
+    const currentlyConfigured = config !== null;
+    setIsConfigured(currentlyConfigured);
+    setConfigSource(config?.source);
+
+    if (!currentlyConfigured) {
       // Supabase credentials not present; use verified baseline
       setContent(DEFAULT_WEBSITE_CONTENT);
       setProducts(BASELINE_PRODUCTS);
       setIsOffline(true);
+      setIsMissingTables(false);
+      setLastError('VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are missing from environment.');
       setIsLoading(false);
       return;
     }
@@ -79,51 +88,77 @@ export function ContentProvider({ children }: { children: ReactNode }) {
         setContent(DEFAULT_WEBSITE_CONTENT);
         setProducts(BASELINE_PRODUCTS);
         setIsOffline(true);
-        setLastError(`Connection timed out after ${BOUNDED_TIMEOUT_MS}ms. Displaying verified local masonry baseline.`);
+        setLastError(`Connection timed out after ${BOUNDED_TIMEOUT_MS}ms. Supabase project may be paused or unreachable.`);
         setIsLoading(false);
         return;
       }
 
       const { contentResult, productsResult } = raceResult;
-
       let detectedMissingTable = false;
       let detectedOffline = false;
+      let extractedError: string | null = null;
 
       // 1. Process Content
       if (contentResult.status === 'fulfilled') {
         const c = contentResult.value;
-        if (c.isMissingTable) detectedMissingTable = true;
-        if (c.isOffline) detectedOffline = true;
-        if (c.data) setContent(c.data);
+        if (c.isMissingTable) {
+          detectedMissingTable = true;
+          if (c.error) extractedError = c.error.message;
+        }
+        if (c.isOffline) {
+          detectedOffline = true;
+          if (c.error) extractedError = c.error.message;
+        }
+        if (c.data && !c.isOffline) {
+          setContent(c.data);
+        }
       } else {
         detectedOffline = true;
+        extractedError = contentResult.reason?.message || 'Failed to fetch content';
       }
 
       // 2. Process Products
       if (productsResult.status === 'fulfilled') {
         const p = productsResult.value;
-        if (p.isMissingTable) detectedMissingTable = true;
-        if (p.isOffline) detectedOffline = true;
-
+        if (p.isMissingTable) {
+          detectedMissingTable = true;
+          if (p.error) extractedError = p.error.message;
+        }
+        if (p.isOffline) {
+          detectedOffline = true;
+          if (p.error) extractedError = p.error.message;
+        }
         if (p.isEmptyTable) {
           setIsEmptyProductsTable(true);
-          // If database table is explicitly empty, we preserve baseline or empty state
           setProducts(BASELINE_PRODUCTS);
-        } else if (p.data && p.data.length > 0) {
+        } else if (p.data && p.data.length > 0 && !p.isOffline) {
           setIsEmptyProductsTable(false);
           setProducts(p.data);
         }
       } else {
         detectedOffline = true;
+        if (!extractedError) {
+          extractedError = productsResult.reason?.message || 'Failed to fetch products';
+        }
       }
 
       setIsMissingTables(detectedMissingTable);
       setIsOffline(detectedOffline);
 
       if (detectedMissingTable) {
-        setLastError('Supabase database tables are not initialized. Run the SQL migration in the Supabase Dashboard.');
+        setLastError(
+          extractedError
+            ? `Table migration needed: ${extractedError}`
+            : 'Supabase database tables are not initialized. Run the SQL migration in your Supabase Dashboard.'
+        );
       } else if (detectedOffline) {
-        setLastError('Could not connect to Supabase. Displaying verified local masonry portfolio baseline.');
+        setLastError(
+          extractedError
+            ? `Supabase error: ${extractedError}`
+            : 'Could not connect to Supabase. Check project status or network connection.'
+        );
+      } else {
+        setLastError(null);
       }
     } catch (err: any) {
       console.error('[Supabase] Initial dual-load exception:', err);
@@ -134,7 +169,7 @@ export function ContentProvider({ children }: { children: ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [configured]);
+  }, []);
 
   useEffect(() => {
     loadInitialData();
@@ -147,6 +182,8 @@ export function ContentProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     setIsOffline(false);
     setIsMissingTables(false);
+    // Reinitialize the Supabase client so any runtime credentials or environment changes take effect
+    reinitializeClient();
     await loadInitialData();
   }, [loadInitialData]);
 
@@ -220,8 +257,9 @@ export function ContentProvider({ children }: { children: ReactNode }) {
         isOffline,
         isMissingTables,
         isEmptyProductsTable,
-        isConfigured: configured,
+        isConfigured,
         lastError,
+        configSource,
         retryConnection,
         updateContentSection,
         resetContentSection,
