@@ -32,10 +32,12 @@ export function mapRowToProduct(row: any): Product {
       license: 'Proprietary',
       modifications: 'None',
     },
-    specifications: row.specifications || {
-      finish: 'Polished face with honed kerb borders',
-      materialOptions: 'Zimbabwe Black Granite',
-      sizingNote: 'Standard single or custom family plot dimensions',
+    specifications: {
+      heading: row.specifications?.heading || 'Craftsmanship & Specifications',
+      materialOptions: row.specifications?.materialOptions || 'Grey Granite, Zimbabwe Black, Light Granite',
+      finish: row.specifications?.finish || 'Fine honed matte or full high-gloss polish',
+      sizingNote: row.specifications?.sizingNote || 'Available in standard cemetery regulatory heights. Contact us to discuss available options.',
+      ...(row.specifications?.edgeProfile ? { edgeProfile: row.specifications.edgeProfile } : {}),
     },
     featured: Boolean(row.featured),
     priceDisplayMode: row.price_display_mode || 'quotation_only',
@@ -218,10 +220,12 @@ export async function createProduct(
       license: 'Proprietary',
       modifications: 'None',
     },
-    specifications: product.specifications || {
-      finish: 'Polished',
-      materialOptions: 'Zimbabwe Black Granite',
-      sizingNote: 'Custom sizing available',
+    specifications: {
+      heading: product.specifications?.heading || 'Craftsmanship & Specifications',
+      materialOptions: product.specifications?.materialOptions || 'Grey Granite, Zimbabwe Black, Light Granite',
+      finish: product.specifications?.finish || 'Fine honed matte or full high-gloss polish',
+      sizingNote: product.specifications?.sizingNote || 'Available in standard cemetery regulatory heights. Contact us to discuss available options.',
+      ...(product.specifications?.edgeProfile ? { edgeProfile: product.specifications.edgeProfile } : {}),
     },
     featured: Boolean(product.featured),
     priceDisplayMode: product.priceDisplayMode || 'quotation_only',

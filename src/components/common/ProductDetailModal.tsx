@@ -1,8 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
-import { X, MessageCircle, FileText, Info, ExternalLink, Tag } from 'lucide-react';
+import { X } from 'lucide-react';
 import { Product } from '../../types/content';
-import { getProductWhatsAppUrl } from '../../config/siteConfig';
 import { getImageDisplayStyles } from '../../utils/imageStyles';
 
 interface ProductDetailModalProps {
@@ -16,7 +14,7 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
   useEffect(() => {
     if (!product) return;
 
-    // Focus close button on open
+    // Focus close button on open for accessibility
     closeButtonRef.current?.focus();
 
     // Escape key listener
@@ -27,7 +25,7 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
     };
 
     window.addEventListener('keydown', handleKeyDown);
-    // Prevent background scrolling
+    // Prevent background scrolling while modal is open
     document.body.style.overflow = 'hidden';
 
     return () => {
@@ -38,15 +36,18 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
 
   if (!product) return null;
 
-  // Render pricing display
-  let pricingText = 'Quotation Upon Stone Selection & Site Dimensions';
-  if (product.priceDisplayMode === 'starting_from' && product.priceAmount) {
-    pricingText = `From $${product.priceAmount.toFixed(2)} ${product.priceCurrency || 'USD'} ${product.priceNote ? `(${product.priceNote})` : ''}`;
-  } else if (product.priceDisplayMode === 'fixed_price' && product.priceAmount) {
-    pricingText = `$${product.priceAmount.toFixed(2)} ${product.priceCurrency || 'USD'} ${product.priceNote ? `(${product.priceNote})` : ''}`;
-  } else if (product.priceNote) {
-    pricingText = product.priceNote;
-  }
+  // Retrieve editable specification values with sensible fallbacks
+  const sectionHeading =
+    product.specifications?.heading || 'Craftsmanship & Specifications';
+  const stoneOptions =
+    product.specifications?.materialOptions ||
+    'Grey Granite, Zimbabwe Black, Light Granite';
+  const surfaceFinish =
+    product.specifications?.finish ||
+    'Fine honed matte or full high-gloss polish';
+  const dimensionsAndSizing =
+    product.specifications?.sizingNote ||
+    'Available in standard cemetery regulatory heights. Contact us to discuss available options.';
 
   return (
     <div
@@ -57,8 +58,7 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
         role="dialog"
         aria-modal="true"
         aria-labelledby="product-modal-title"
-        aria-describedby="product-modal-desc"
-        className="bg-[#1D2023] border border-[#2D3237] rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl relative text-[#F5F1E8] flex flex-col md:flex-row"
+        className="bg-[#1D2023] border border-[#2D3237] rounded-lg max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl relative text-[#F5F1E8] flex flex-col md:flex-row"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button */}
@@ -71,118 +71,48 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
           <X className="w-5 h-5" />
         </button>
 
-        {/* Product Image Column */}
-        <div className="md:w-1/2 relative bg-[#121415] min-h-[280px] md:min-h-full overflow-hidden flex items-center justify-center">
+        {/* Product Image Column with preserved zoom, position, and fit mode */}
+        <div className="md:w-1/2 relative bg-[#121415] min-h-[260px] sm:min-h-[300px] md:min-h-[360px] overflow-hidden flex items-center justify-center">
           <img
             src={product.imageUrl}
-            alt={product.imageAlt}
+            alt={product.imageAlt || product.name}
             loading="eager"
             style={getImageDisplayStyles(product.imageSettings)}
-            className="w-full h-full max-h-[460px] md:max-h-none select-none transition-transform duration-300"
+            className="w-full h-full max-h-[420px] md:max-h-none select-none transition-transform duration-300"
           />
-          {product.imageAttribution?.photographer && (
-            <div className="absolute bottom-2 left-2 bg-[#17191B]/90 backdrop-blur-xs text-[10px] text-[#B9B5AC] px-2.5 py-1 rounded border border-[#2D3237]">
-              Photo: {product.imageAttribution.photographer} ({product.imageAttribution.license})
-            </div>
-          )}
         </div>
 
-        {/* Content Column */}
-        <div className="md:w-1/2 p-6 sm:p-8 flex flex-col justify-between space-y-6">
-          <div className="space-y-4">
-            {/* Category Breadcrumb */}
-            <div className="flex items-center gap-2 text-xs text-[#B79A68] uppercase tracking-widest font-medium">
-              <span>{product.category}</span>
-              <span aria-hidden="true">·</span>
-              <span className="text-[#8E8B82]">Bespoke Masonry</span>
-            </div>
+        {/* Content Column: Product Name + Craftsmanship & Specifications only */}
+        <div className="md:w-1/2 p-6 sm:p-8 flex flex-col justify-center space-y-6">
+          {/* 1. Product/Design Name */}
+          <h2
+            id="product-modal-title"
+            className="font-serif text-2xl sm:text-3xl text-[#F5F1E8] font-bold leading-tight"
+          >
+            {product.name}
+          </h2>
 
-            <h2 id="product-modal-title" className="font-serif text-2xl sm:text-3xl text-[#F5F1E8] font-bold">
-              {product.name}
-            </h2>
+          {/* 2. Craftsmanship & Specifications Section */}
+          <div className="bg-[#17191B] border border-[#2D3237] p-5 rounded-lg space-y-4 text-xs">
+            <h3 className="font-serif font-bold text-sm sm:text-base text-[#B79A68] tracking-wide border-b border-[#252A2E] pb-2.5">
+              {sectionHeading}
+            </h3>
 
-            {/* Pricing Guidance Display */}
-            <div className="inline-flex items-center gap-2 bg-[#17191B] border border-[#B79A68]/40 px-3 py-1.5 rounded text-xs">
-              <Tag className="w-3.5 h-3.5 text-[#B79A68]" />
-              <span className="text-[#DFD9CB] font-semibold">{pricingText}</span>
-            </div>
-
-            <p id="product-modal-desc" className="text-sm text-[#DFD9CB] leading-relaxed">
-              {product.longDescription}
-            </p>
-
-            {/* Specifications Card */}
-            <div className="bg-[#17191B] border border-[#2D3237] p-4 rounded space-y-2.5 text-xs">
-              <h3 className="font-semibold uppercase tracking-wider text-[11px] text-[#B79A68] flex items-center gap-1.5">
-                <Info className="w-3.5 h-3.5" />
-                <span>Craftsmanship & Specifications</span>
-              </h3>
-              
-              <div className="grid grid-cols-1 gap-2 pt-1 text-[#B9B5AC]">
-                <div>
-                  <span className="text-[#DFD9CB] font-medium">Stone Options:</span>{' '}
-                  {product.specifications?.materialOptions || 'Zimbabwe Black Granite'}
-                </div>
-                <div>
-                  <span className="text-[#DFD9CB] font-medium">Surface Finish:</span>{' '}
-                  {product.specifications?.finish || 'Polished face'}
-                </div>
-                {product.specifications?.edgeProfile && (
-                  <div>
-                    <span className="text-[#DFD9CB] font-medium">Edge Profile:</span>{' '}
-                    {product.specifications.edgeProfile}
-                  </div>
-                )}
-                <div className="text-[11px] text-[#8E8B82] pt-1 border-t border-[#252A2E]">
-                  <span className="text-[#DFD9CB] font-medium">Dimensions & Sizing:</span>{' '}
-                  {product.specifications?.sizingNote || 'Custom sizing available'}
-                </div>
+            {/* 3. The Three Required Specification Fields */}
+            <div className="space-y-3 pt-0.5 text-[#DFD9CB]">
+              <div>
+                <span className="font-semibold text-[#F5F1E8]">Stone Options:</span>{' '}
+                <span className="text-[#B9B5AC]">{stoneOptions}</span>
+              </div>
+              <div>
+                <span className="font-semibold text-[#F5F1E8]">Surface Finish:</span>{' '}
+                <span className="text-[#B9B5AC]">{surfaceFinish}</span>
+              </div>
+              <div>
+                <span className="font-semibold text-[#F5F1E8]">Dimensions & Sizing:</span>{' '}
+                <span className="text-[#B9B5AC]">{dimensionsAndSizing}</span>
               </div>
             </div>
-
-            {/* Copyright & License Note */}
-            {product.imageAttribution?.source && (
-              <div className="text-[11px] text-[#8E8B82] bg-[#17191B]/50 p-2.5 rounded border border-[#252A2E]">
-                <span className="font-medium text-[#B9B5AC]">Image Rights Verified:</span> Sourced from {product.imageAttribution.source} under {product.imageAttribution.license}.
-              </div>
-            )}
-          </div>
-
-          {/* Action Buttons */}
-          <div className="space-y-3 pt-2">
-            <a
-              href={getProductWhatsAppUrl(product.name, product.category)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full inline-flex items-center justify-center gap-2.5 text-xs font-semibold uppercase tracking-wider bg-[#25D366] hover:bg-[#20BA5A] text-[#121415] py-3 px-4 rounded transition-colors cursor-pointer shadow-sm"
-            >
-              <MessageCircle className="w-4 h-4" />
-              <span>Enquire on WhatsApp</span>
-              <ExternalLink className="w-3.5 h-3.5 ml-1" />
-            </a>
-
-            <div className="flex items-center gap-3">
-              <Link
-                to={`/request-a-quote?product=${encodeURIComponent(product.name)}&category=${encodeURIComponent(product.category)}`}
-                onClick={onClose}
-                className="flex-1 inline-flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-wider bg-[#B79A68] hover:bg-[#CBB17F] text-[#17191B] py-2.5 px-4 rounded transition-colors"
-              >
-                <FileText className="w-4 h-4" />
-                <span>Request Email Quote</span>
-              </Link>
-
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2.5 text-xs text-[#B9B5AC] hover:text-white border border-[#2D3237] rounded hover:bg-[#252A2E] transition-colors cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-            
-            <p className="text-[10px] text-center text-[#8E8B82]">
-              Inquiry opens external WhatsApp or secure quote form. No personal data transmitted without your action.
-            </p>
           </div>
         </div>
       </div>

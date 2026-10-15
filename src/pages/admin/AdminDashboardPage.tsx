@@ -410,9 +410,10 @@ export function AdminDashboardPage() {
       isPublished: true,
       sortOrder: products.length + 1,
       specifications: {
-        finish: 'Polished face with honed kerb borders',
-        materialOptions: 'Zimbabwe Black Granite',
-        sizingNote: 'Standard single plot dimensions or custom family plot',
+        heading: 'Craftsmanship & Specifications',
+        materialOptions: 'Grey Granite, Zimbabwe Black, Light Granite',
+        finish: 'Fine honed matte or full high-gloss polish',
+        sizingNote: 'Available in standard cemetery regulatory heights. Contact us to discuss available options.',
       },
       imageSettings: {
         zoom: 100,
@@ -427,6 +428,13 @@ export function AdminDashboardPage() {
   const handleOpenEditProduct = (p: Product) => {
     setEditingProduct({
       ...p,
+      specifications: {
+        heading: p.specifications?.heading || 'Craftsmanship & Specifications',
+        materialOptions: p.specifications?.materialOptions || 'Grey Granite, Zimbabwe Black, Light Granite',
+        finish: p.specifications?.finish || 'Fine honed matte or full high-gloss polish',
+        sizingNote: p.specifications?.sizingNote || 'Available in standard cemetery regulatory heights. Contact us to discuss available options.',
+        ...(p.specifications?.edgeProfile ? { edgeProfile: p.specifications.edgeProfile } : {}),
+      },
       imageSettings: p.imageSettings || {
         zoom: 100,
         posX: 50,
@@ -2109,6 +2117,104 @@ WHERE LOWER(a.email) = LOWER(u.email)
                   />
                 </div>
               )}
+
+              {/* Craftsmanship & Specifications (View Design Modal Content) */}
+              <div className="bg-[#17191B] border border-[#2D3237] p-4 rounded-lg space-y-3">
+                <div className="flex items-center justify-between border-b border-[#252A2E] pb-2">
+                  <h4 className="text-xs uppercase tracking-wider text-[#B79A68] font-bold">
+                    Craftsmanship & Specifications (View Design Modal)
+                  </h4>
+                  <span className="text-[10px] text-[#8E8B82]">
+                    Customer-facing modal content
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] uppercase tracking-wider text-[#DFD9CB] font-semibold mb-1">
+                    Section Heading
+                  </label>
+                  <input
+                    type="text"
+                    value={editingProduct.specifications?.heading ?? 'Craftsmanship & Specifications'}
+                    onChange={(e) =>
+                      setEditingProduct({
+                        ...editingProduct,
+                        specifications: {
+                          ...(editingProduct.specifications || { finish: '', materialOptions: '', sizingNote: '' }),
+                          heading: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="Craftsmanship & Specifications"
+                    className="w-full bg-[#1D2023] border border-[#2D3237] text-xs text-[#F5F1E8] p-2 rounded focus:border-[#B79A68] focus:outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] uppercase tracking-wider text-[#DFD9CB] font-semibold mb-1">
+                      Stone Options
+                    </label>
+                    <input
+                      type="text"
+                      value={editingProduct.specifications?.materialOptions ?? ''}
+                      onChange={(e) =>
+                        setEditingProduct({
+                          ...editingProduct,
+                          specifications: {
+                            ...(editingProduct.specifications || { finish: '', materialOptions: '', sizingNote: '' }),
+                            materialOptions: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="e.g. Grey Granite, Zimbabwe Black, Light Granite"
+                      className="w-full bg-[#1D2023] border border-[#2D3237] text-xs text-[#F5F1E8] p-2 rounded focus:border-[#B79A68] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] uppercase tracking-wider text-[#DFD9CB] font-semibold mb-1">
+                      Surface Finish
+                    </label>
+                    <input
+                      type="text"
+                      value={editingProduct.specifications?.finish ?? ''}
+                      onChange={(e) =>
+                        setEditingProduct({
+                          ...editingProduct,
+                          specifications: {
+                            ...(editingProduct.specifications || { finish: '', materialOptions: '', sizingNote: '' }),
+                            finish: e.target.value,
+                          },
+                        })
+                      }
+                      placeholder="e.g. Fine honed matte or full high-gloss polish"
+                      className="w-full bg-[#1D2023] border border-[#2D3237] text-xs text-[#F5F1E8] p-2 rounded focus:border-[#B79A68] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] uppercase tracking-wider text-[#DFD9CB] font-semibold mb-1">
+                    Dimensions & Sizing
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={editingProduct.specifications?.sizingNote ?? ''}
+                    onChange={(e) =>
+                      setEditingProduct({
+                        ...editingProduct,
+                        specifications: {
+                          ...(editingProduct.specifications || { finish: '', materialOptions: '', sizingNote: '' }),
+                          sizingNote: e.target.value,
+                        },
+                      })
+                    }
+                    placeholder="e.g. Available in standard cemetery regulatory heights. Contact us to discuss available options."
+                    className="w-full bg-[#1D2023] border border-[#2D3237] text-xs text-[#F5F1E8] p-2 rounded focus:border-[#B79A68] focus:outline-none"
+                  />
+                </div>
+              </div>
 
               {/* Pricing settings */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

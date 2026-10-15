@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Phone, Mail, MapPin, MessageCircle, Clock, ShieldCheck, FileText, ChevronRight, Lock } from 'lucide-react';
+import { Phone, Mail, MapPin, MessageCircle, Clock, ChevronRight } from 'lucide-react';
 import { useContent } from '../../context/ContentContext';
 import { SITE_CONFIG, getWhatsAppUrl } from '../../config/siteConfig';
 
@@ -8,8 +8,6 @@ export function Footer() {
   const { content } = useContent();
 
   const brandStatement = content?.footer?.brandStatement || "Bespoke granite memorials, architectural countertops, and custom stone masonry tailored for discerning families and developers across Zimbabwe.";
-  const assuranceHeading = content?.footer?.assuranceHeading || "Client Assurance & Standards";
-  const assuranceIntro = content?.footer?.assuranceIntro || "Committed to ethical masonry standards, transparent contracts, and regulatory alignment across Zimbabwe:";
 
   const address = content?.contact
     ? `${content.contact.physicalAddress}, ${content.contact.city}, ${content.contact.country}`
@@ -26,8 +24,8 @@ export function Footer() {
     <footer className="bg-[#121415] border-t border-[#2D3237] text-[#DFD9CB] pt-16 pb-12 mt-20" aria-labelledby="footer-heading">
       <h2 id="footer-heading" className="sr-only">Footer</h2>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Main 4-column Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 pb-12 border-b border-[#222629]">
+        {/* Main 3-column Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 lg:gap-12 pb-12 border-b border-[#222629]">
           {/* Column 1: Brand & Craftsmanship */}
           <div className="space-y-4">
             <Link to="/" className="inline-block">
@@ -126,46 +124,9 @@ export function Footer() {
               </div>
             </div>
           </div>
-
-          {/* Column 4: Client Guidance & Assurance (Preserved Exactly) */}
-          <div>
-            <h3 className="font-serif text-base text-[#F5F1E8] mb-4 tracking-wide flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-[#B79A68]" />
-              <span>{assuranceHeading}</span>
-            </h3>
-            <p className="text-[11px] text-[#8E8B82] mb-3 leading-relaxed">
-              {assuranceIntro}
-            </p>
-            <ul className="space-y-2 text-xs text-[#B9B5AC]">
-              <li>
-                <Link to="/compliance/zimbabwe-legal-review" className="hover:text-[#B79A68] transition-colors flex items-center gap-1.5">
-                  <FileText className="w-3 h-3 text-[#B79A68]" />
-                  <span>Zimbabwe Cemetery Guidelines & Bylaws</span>
-                </Link>
-              </li>
-              <li>
-                <Link to="/compliance/image-licenses" className="hover:text-[#B79A68] transition-colors flex items-center gap-1.5">
-                  <FileText className="w-3 h-3 text-[#B79A68]" />
-                  <span>Material Standards & Image Rights</span>
-                </Link>
-              </li>
-              <li>
-                <Link to="/about" className="hover:text-[#B79A68] transition-colors flex items-center gap-1.5">
-                  <FileText className="w-3 h-3 text-[#B79A68]" />
-                  <span>Craftsmanship & Stone Origin</span>
-                </Link>
-              </li>
-              <li>
-                <Link to="/request-a-quote" className="hover:text-[#B79A68] transition-colors flex items-center gap-1.5">
-                  <FileText className="w-3 h-3 text-[#B79A68]" />
-                  <span>Formal Quotations & Site Visits</span>
-                </Link>
-              </li>
-            </ul>
-          </div>
         </div>
 
-        {/* Legal & Policy Links Row */}
+        {/* Legal & Policy Links Row (Admin Portal link removed from public navigation) */}
         <div className="py-6 border-b border-[#222629] flex flex-wrap items-center justify-between gap-4 text-xs text-[#8E8B82]">
           <nav className="flex flex-wrap items-center gap-x-6 gap-y-2" aria-label="Legal & Policies">
             <Link to="/privacy-policy" className="hover:text-[#F5F1E8] transition-colors">
@@ -182,10 +143,6 @@ export function Footer() {
             </Link>
             <Link to="/accessibility-statement" className="hover:text-[#F5F1E8] transition-colors">
               Accessibility Statement
-            </Link>
-            <Link to="/admin" className="hover:text-[#B79A68] transition-colors inline-flex items-center gap-1 text-[11px]">
-              <Lock className="w-3 h-3 text-[#B79A68]" />
-              <span>Admin Portal</span>
             </Link>
           </nav>
           <div>

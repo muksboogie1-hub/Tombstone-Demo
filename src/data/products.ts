@@ -16,6 +16,7 @@ export interface Product {
     modifications: string;
   };
   specifications: {
+    heading?: string;
     finish: string;
     materialOptions: string;
     edgeProfile?: string;
@@ -24,6 +25,13 @@ export interface Product {
   featured: boolean;
   imageSettings?: ImageDisplaySettings;
 }
+
+export const DEFAULT_SPECIFICATIONS = {
+  heading: 'Craftsmanship & Specifications',
+  materialOptions: 'Grey Granite, Zimbabwe Black, Light Granite',
+  finish: 'Fine honed matte or full high-gloss polish',
+  sizingNote: 'Available in standard cemetery regulatory heights. Contact us to discuss available options.',
+};
 
 export const PRODUCTS: Product[] = [
   // --- TOMBSTONES & MEMORIALS ---
