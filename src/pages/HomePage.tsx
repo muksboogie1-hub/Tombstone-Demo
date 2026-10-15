@@ -7,6 +7,7 @@ import { ProductDetailModal } from '../components/common/ProductDetailModal';
 import { useContent } from '../context/ContentContext';
 import { Product } from '../types/content';
 import { SITE_CONFIG, getWhatsAppUrl } from '../config/siteConfig';
+import { DEFAULT_HERO_IMAGE_URL } from '../data/defaultContent';
 
 export function HomePage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -36,10 +37,15 @@ export function HomePage() {
         {/* Background Cinematic Stone Image */}
         <div className="absolute inset-0 z-0">
           <img
-            src="https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&q=80&w=2000"
-            alt="Dignified stone memorial structure standing serenely under soft ambient sky"
+            src={hero?.backgroundImageUrl || hero?.heroImageUrl || DEFAULT_HERO_IMAGE_URL}
+            alt={hero?.imageAlt || "Dignified stone memorial structure standing serenely under soft ambient sky"}
             className="w-full h-full object-cover object-center filter brightness-45 contrast-110"
             loading="eager"
+            onError={(e) => {
+              if (e.currentTarget.src !== DEFAULT_HERO_IMAGE_URL) {
+                e.currentTarget.src = DEFAULT_HERO_IMAGE_URL;
+              }
+            }}
           />
           <div className="absolute inset-0 bg-radial from-transparent via-[#17191B]/80 to-[#17191B]"></div>
           <div className="absolute inset-0 bg-linear-to-t from-[#17191B] via-transparent to-[#17191B]/60"></div>
@@ -49,15 +55,15 @@ export function HomePage() {
         <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-8">
           {/* Subtle Badge */}
           <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-[#B79A68] border border-[#B79A68]/30 px-3.5 py-1.5 rounded-full bg-[#17191B]/80 backdrop-blur-xs">
-            <span>{hero?.badge || 'Artisanal Stonemasonry · Zimbabwe'}</span>
+            <span>{hero?.badge || (hero as any)?.eyebrow || 'Artisanal Stonemasonry · Zimbabwe'}</span>
           </div>
 
           <h1 className="font-serif text-4xl sm:text-6xl md:text-7xl font-bold text-[#F5F1E8] tracking-tight leading-[1.08] max-w-4xl mx-auto">
-            {hero?.title || 'Stone That Speaks Beyond Time.'}
+            {hero?.title || (hero as any)?.headline || 'Stone That Speaks Beyond Time.'}
           </h1>
 
           <p className="text-base sm:text-lg md:text-xl text-[#DFD9CB] max-w-2xl mx-auto font-light leading-relaxed">
-            {hero?.subtitle || 'Bespoke Zimbabwean black granite memorials, custom tombstone craft, and precision-cut architectural stonework.'}
+            {hero?.subtitle || (hero as any)?.subheadline || 'Bespoke Zimbabwean black granite memorials, custom tombstone craft, and precision-cut architectural stonework.'}
           </p>
 
           <p className="text-xs text-[#B9B5AC] max-w-lg mx-auto">

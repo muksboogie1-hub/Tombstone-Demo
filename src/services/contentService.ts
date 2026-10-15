@@ -232,3 +232,99 @@ export async function seedContentToSupabase(): Promise<{ count: number; error: E
     return { count: 0, error: err instanceof Error ? err : new Error(String(err)) };
   }
 }
+
+/**
+ * Admin: Upload hero background image to Supabase Storage bucket 'website-assets'
+ * Provides instant Data URL preview fallback and handles missing bucket creation.
+ */
+export async function uploadHeroImage(file: File): Promise<{ url: string | null; error: Error | null }> {
+  // Validate MIME type
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+  const ext = file.name.split('.').pop()?.toLowerCase() || '';
+  const isAllowedExt = ['jpg', 'jpeg', 'png', 'webp'].includes(ext);
+
+  if (!allowedTypes.includes(file.type.toLowerCase()) && !isAllowedExt) {
+    return {
+      url: null,
+      error: new Error('Unsupported image format. Please select a JPG, JPEG, PNG, or WebP image.'),
+    };
+  }
+
+  // Max 10 MB limit
+  const MAX_FILE_SIZE = 10 * 1024 * 1024;
+  if (file.size > MAX_FILE_SIZE) {
+    return {
+      url: null,
+      error: new Error(`File is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). Maximum allowed size is 10 MB.`),
+    };
+  }
+
+  const readDataUrl = (): Promise<string> =>
+    new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
+
+  const previewUrl = await readDataUrl();
+  const hasLive = await isSupabaseSession();
+  const client = getSupabaseClient();
+
+  // If in Preview Sandbox or client missing, return preview URL
+  if (!hasLive || !client) {
+    return { url: previewUrl, error: null };
+  }
+
+  try {
+    const fileExt = ext || 'jpg';
+    const cleanExt = fileExt.replace(/[^a-z0-9]/g, '');
+    const fileName = `hero-${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${cleanExt}`;
+    const filePath = `hero/${fileName}`;
+
+    const { data, error } = await client.storage
+      .from('website-assets')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    if (error) {
+      const isMissingBucket =
+        error.message?.toLowerCase().includes('bucket not found') ||
+        (error as any).statusCode === '404' ||
+        (error as any).error?.toLowerCase?.().includes('bucket not found');
+
+      if (isMissingBucket) {
+        try {
+          const { error: createErr } = await client.storage.createBucket('website-assets', {
+            public: true,
+          });
+          if (!createErr) {
+            const retry = await client.storage.from('website-assets').upload(filePath, file);
+            if (!retry.error && retry.data) {
+              const { data: retryPub } = client.storage.from('website-assets').getPublicUrl(retry.data.path);
+              return { url: retryPub.publicUrl, error: null };
+            }
+          }
+        } catch {
+          // create failed
+        }
+      }
+
+      // If storage upload fails due to RLS or permissions, provide data URL preview with error detail
+      return {
+        url: previewUrl,
+        error: new Error(formatSupabaseError(error)),
+      };
+    }
+
+    const { data: publicUrlData } = client.storage.from('website-assets').getPublicUrl(data.path);
+    return { url: publicUrlData.publicUrl, error: null };
+  } catch (err: any) {
+    return {
+      url: previewUrl,
+      error: err instanceof Error ? err : new Error(String(err)),
+    };
+  }
+}

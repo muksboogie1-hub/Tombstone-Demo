@@ -24,6 +24,12 @@ export interface HeroContent {
   primaryButtonText: string;
   secondaryButtonText: string;
   whatsappButtonText: string;
+  backgroundImageUrl?: string;
+  heroImageUrl?: string;
+  imageAlt?: string;
+  eyebrow?: string;
+  headline?: string;
+  subheadline?: string;
 }
 
 export interface AboutContent {

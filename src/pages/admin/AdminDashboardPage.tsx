@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import {
   Shield,
@@ -25,15 +25,17 @@ import {
   UserX,
   Settings,
   Sparkles,
+  X,
 } from 'lucide-react';
 import { isSupabaseConfigured, testSupabaseConnection, getSupabaseConfigStatus } from '../../lib/supabaseClient';
 import { useContent } from '../../context/ContentContext';
 import { WebsiteContent, Product } from '../../types/content';
+import { DEFAULT_HERO_IMAGE_URL } from '../../data/defaultContent';
 import {
   uploadProductImage,
   seedProductsToSupabase,
 } from '../../services/productService';
-import { seedContentToSupabase } from '../../services/contentService';
+import { seedContentToSupabase, uploadHeroImage } from '../../services/contentService';
 import {
   adminSignOut,
   getCurrentAdminUser,
@@ -76,6 +78,13 @@ export function AdminDashboardPage() {
   const [formData, setFormData] = useState<any>(content[activeSection] || {});
   const [isSaving, setIsSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Hero Image editor states
+  const heroFileInputRef = useRef<HTMLInputElement>(null);
+  const [pendingHeroFile, setPendingHeroFile] = useState<File | null>(null);
+  const [pendingHeroPreviewUrl, setPendingHeroPreviewUrl] = useState<string | null>(null);
+  const [isSavingHeroImage, setIsSavingHeroImage] = useState(false);
+  const [heroImageMessage, setHeroImageMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Product modal states
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -163,7 +172,22 @@ export function AdminDashboardPage() {
     setIsSaving(true);
     setStatusMessage(null);
     try {
-      const success = await updateContentSection(activeSection, formData);
+      const sectionPayload = {
+        ...formData,
+        ...(activeSection === 'hero'
+          ? {
+              backgroundImageUrl: activeHeroImage,
+              heroImageUrl: activeHeroImage,
+              badge: formData.badge ?? formData.eyebrow,
+              eyebrow: formData.badge ?? formData.eyebrow,
+              title: formData.title ?? formData.headline,
+              headline: formData.title ?? formData.headline,
+              subtitle: formData.subtitle ?? formData.subheadline,
+              subheadline: formData.subtitle ?? formData.subheadline,
+            }
+          : {}),
+      };
+      const success = await updateContentSection(activeSection, sectionPayload);
       if (success) {
         setStatusMessage({
           type: 'success',
@@ -202,6 +226,166 @@ export function AdminDashboardPage() {
       }
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Active Hero image computed value
+  const activeHeroImage =
+    formData.backgroundImageUrl ||
+    formData.heroImageUrl ||
+    content.hero?.backgroundImageUrl ||
+    content.hero?.heroImageUrl ||
+    DEFAULT_HERO_IMAGE_URL;
+
+  // Hero background image handlers
+  const handleHeroFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setHeroImageMessage(null);
+
+    // Validate MIME type & file extension
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    const isAllowedExt = ['jpg', 'jpeg', 'png', 'webp'].includes(ext);
+
+    if (!allowedTypes.includes(file.type.toLowerCase()) && !isAllowedExt) {
+      setHeroImageMessage({
+        type: 'error',
+        text: 'Unsupported image format. Please select a JPG, JPEG, PNG, or WebP image.',
+      });
+      if (heroFileInputRef.current) heroFileInputRef.current.value = '';
+      return;
+    }
+
+    // Max 10 MB limit
+    const MAX_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_SIZE) {
+      setHeroImageMessage({
+        type: 'error',
+        text: `File is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). Maximum allowed size is 10 MB.`,
+      });
+      if (heroFileInputRef.current) heroFileInputRef.current.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setPendingHeroPreviewUrl(reader.result as string);
+      setPendingHeroFile(file);
+      setHeroImageMessage(null);
+    };
+    reader.onerror = () => {
+      setHeroImageMessage({
+        type: 'error',
+        text: 'Failed to read selected image file.',
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCancelHeroImage = () => {
+    setPendingHeroFile(null);
+    setPendingHeroPreviewUrl(null);
+    setHeroImageMessage(null);
+    if (heroFileInputRef.current) {
+      heroFileInputRef.current.value = '';
+    }
+  };
+
+  const handleSaveHeroImage = async () => {
+    if (!pendingHeroFile) return;
+
+    setIsSavingHeroImage(true);
+    setHeroImageMessage(null);
+
+    try {
+      const { url, error } = await uploadHeroImage(pendingHeroFile);
+      if (error && !url) {
+        throw error;
+      }
+
+      const newImageUrl = url || pendingHeroPreviewUrl || DEFAULT_HERO_IMAGE_URL;
+
+      const updatedHero = {
+        ...content.hero,
+        ...formData,
+        backgroundImageUrl: newImageUrl,
+        heroImageUrl: newImageUrl,
+        badge: formData.badge ?? formData.eyebrow ?? content.hero?.badge,
+        title: formData.title ?? formData.headline ?? content.hero?.title,
+        subtitle: formData.subtitle ?? formData.subheadline ?? content.hero?.subtitle,
+      };
+
+      setFormData(updatedHero);
+      const success = await updateContentSection('hero', updatedHero);
+
+      if (success) {
+        setPendingHeroFile(null);
+        setPendingHeroPreviewUrl(null);
+        if (heroFileInputRef.current) {
+          heroFileInputRef.current.value = '';
+        }
+        setHeroImageMessage({
+          type: 'success',
+          text: error
+            ? 'Hero image updated and cached locally. Note: ' + error.message
+            : 'Hero background image successfully uploaded and saved to website!',
+        });
+        setTimeout(() => setHeroImageMessage(null), 5000);
+      } else {
+        throw new Error('Failed to save hero image changes to database.');
+      }
+    } catch (err: any) {
+      setHeroImageMessage({
+        type: 'error',
+        text: err?.message || 'Error occurred while saving hero image.',
+      });
+    } finally {
+      setIsSavingHeroImage(false);
+    }
+  };
+
+  const handleResetHeroImageToDefault = async () => {
+    if (!window.confirm('Reset the hero background image back to the default Zimbabwean black granite memorial image?')) {
+      return;
+    }
+
+    setIsSavingHeroImage(true);
+    setHeroImageMessage(null);
+
+    try {
+      const updatedHero = {
+        ...content.hero,
+        ...formData,
+        backgroundImageUrl: DEFAULT_HERO_IMAGE_URL,
+        heroImageUrl: DEFAULT_HERO_IMAGE_URL,
+      };
+
+      setFormData(updatedHero);
+      const success = await updateContentSection('hero', updatedHero);
+
+      if (success) {
+        setPendingHeroFile(null);
+        setPendingHeroPreviewUrl(null);
+        if (heroFileInputRef.current) {
+          heroFileInputRef.current.value = '';
+        }
+        setHeroImageMessage({
+          type: 'success',
+          text: 'Hero background image reset to default stone visual.',
+        });
+        setTimeout(() => setHeroImageMessage(null), 4000);
+      } else {
+        throw new Error('Failed to reset hero image.');
+      }
+    } catch (err: any) {
+      setHeroImageMessage({
+        type: 'error',
+        text: err?.message || 'Error occurred while resetting hero image.',
+      });
+    } finally {
+      setIsSavingHeroImage(false);
     }
   };
 
@@ -864,41 +1048,304 @@ WHERE LOWER(a.email) = LOWER(u.email)
 
               {/* Dynamic Section Forms */}
               {activeSection === 'hero' && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs uppercase tracking-wider text-[#DFD9CB] mb-1 font-semibold">
-                      Eyebrow / Badge Text
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.eyebrow || ''}
-                      onChange={(e) => handleInputChange('eyebrow', e.target.value)}
-                      className="w-full bg-[#17191B] border border-[#2D3237] text-xs text-[#F5F1E8] p-2.5 rounded focus:border-[#B79A68] focus:outline-none"
-                    />
+                <div className="space-y-6">
+                  {/* --- HERO BACKGROUND IMAGE EDITOR CARD --- */}
+                  <div className="bg-[#121415] border border-[#2D3237] rounded-lg p-5 space-y-4 shadow-inner">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#252A2E] pb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <ImageIcon className="w-4 h-4 text-[#B79A68]" />
+                          <h3 className="text-sm font-bold uppercase tracking-wider text-[#F5F1E8]">
+                            Hero Background Image
+                          </h3>
+                        </div>
+                        <p className="text-xs text-[#8E8B82] mt-0.5">
+                          High-resolution cinematic visual shown behind the homepage title and call-to-actions.
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="file"
+                          ref={heroFileInputRef}
+                          accept="image/jpeg,image/png,image/webp,image/jpg"
+                          className="hidden"
+                          onChange={handleHeroFileSelect}
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() => heroFileInputRef.current?.click()}
+                          disabled={isSavingHeroImage}
+                          className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#17191B] bg-[#B79A68] hover:bg-[#CBB17F] px-3.5 py-2 rounded transition-colors shadow cursor-pointer disabled:opacity-50"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>{activeHeroImage ? 'Replace Image' : 'Upload New Image'}</span>
+                        </button>
+
+                        {activeHeroImage !== DEFAULT_HERO_IMAGE_URL && (
+                          <button
+                            type="button"
+                            onClick={handleResetHeroImageToDefault}
+                            disabled={isSavingHeroImage}
+                            className="inline-flex items-center gap-1.5 text-xs text-[#8E8B82] hover:text-[#DFD9CB] border border-[#3E4348] hover:border-[#8E8B82] px-3 py-2 rounded transition-colors cursor-pointer disabled:opacity-50"
+                            title="Reset back to default factory memorial stone image"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Reset Default</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Dedicated Feedback Alert */}
+                    {heroImageMessage && (
+                      <div
+                        className={`p-3 rounded text-xs flex items-center gap-2.5 transition-all ${
+                          heroImageMessage.type === 'success'
+                            ? 'bg-emerald-950/70 border border-emerald-500/50 text-emerald-200'
+                            : 'bg-red-950/70 border border-red-500/50 text-red-200'
+                        }`}
+                      >
+                        {heroImageMessage.type === 'success' ? (
+                          <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                        ) : (
+                          <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+                        )}
+                        <div className="flex-1">{heroImageMessage.text}</div>
+                        <button
+                          type="button"
+                          onClick={() => setHeroImageMessage(null)}
+                          className="text-[#8E8B82] hover:text-white"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Image Previews Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Active Image Preview */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-[#DFD9CB] font-semibold">Active Hero Image</span>
+                          <span className="text-[10px] text-[#8E8B82] font-mono">
+                            {activeHeroImage === DEFAULT_HERO_IMAGE_URL ? 'Factory Default' : 'Custom Saved'}
+                          </span>
+                        </div>
+
+                        <div className="relative aspect-16/9 rounded overflow-hidden border border-[#2D3237] bg-[#17191B] group">
+                          <img
+                            src={activeHeroImage}
+                            alt="Active homepage hero background"
+                            className="w-full h-full object-cover filter brightness-50"
+                          />
+                          <div className="absolute inset-0 bg-radial from-transparent via-[#17191B]/80 to-[#17191B] pointer-events-none" />
+                          <div className="absolute inset-0 flex flex-col justify-end p-3.5 pointer-events-none">
+                            <span className="text-[10px] uppercase tracking-widest text-[#B79A68] font-bold">
+                              Current Homepage Hero
+                            </span>
+                            <p className="text-xs font-serif font-bold text-[#F5F1E8] truncate">
+                              {formData.title || formData.headline || 'Stone That Speaks Beyond Time.'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Selected Image Pending Preview or Guidance */}
+                      {pendingHeroFile ? (
+                        <div className="space-y-2 border border-[#B79A68]/60 bg-[#1D2023] p-3 rounded-lg flex flex-col justify-between">
+                          <div>
+                            <div className="flex items-center justify-between text-xs mb-2">
+                              <span className="text-[#B79A68] font-semibold flex items-center gap-1.5">
+                                <Sparkles className="w-3.5 h-3.5" />
+                                Selected Image (Unsaved Preview)
+                              </span>
+                              <span className="text-[10px] text-[#8E8B82] font-mono">
+                                {(pendingHeroFile.size / (1024 * 1024)).toFixed(2)} MB
+                              </span>
+                            </div>
+
+                            <div className="relative aspect-16/9 rounded overflow-hidden border border-[#B79A68]/40 bg-[#17191B]">
+                              <img
+                                src={pendingHeroPreviewUrl || ''}
+                                alt="Selected hero preview"
+                                className="w-full h-full object-cover filter brightness-50"
+                              />
+                              <div className="absolute inset-0 bg-radial from-transparent via-[#17191B]/80 to-[#17191B] pointer-events-none" />
+                              <div className="absolute top-2 right-2 bg-[#B79A68] text-[#17191B] text-[10px] font-bold px-2 py-0.5 rounded shadow">
+                                Ready to Save
+                              </div>
+                              <div className="absolute inset-0 flex flex-col justify-end p-3.5 pointer-events-none">
+                                <span className="text-[10px] uppercase tracking-widest text-[#B79A68] font-bold">
+                                  New Preview
+                                </span>
+                                <p className="text-xs font-serif font-bold text-[#F5F1E8] truncate">
+                                  {formData.title || formData.headline || 'Stone That Speaks Beyond Time.'}
+                                </p>
+                              </div>
+                            </div>
+
+                            <p className="text-[11px] text-[#8E8B82] mt-2 truncate" title={pendingHeroFile.name}>
+                              File: <span className="text-[#DFD9CB]">{pendingHeroFile.name}</span>
+                            </p>
+                          </div>
+
+                          {/* Save Changes & Cancel Buttons */}
+                          <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#2D3237] mt-3">
+                            <button
+                              type="button"
+                              onClick={handleCancelHeroImage}
+                              disabled={isSavingHeroImage}
+                              className="inline-flex items-center gap-1.5 text-xs text-[#8E8B82] hover:text-[#F5F1E8] px-3.5 py-1.5 rounded border border-[#3E4348] hover:border-[#8E8B82] transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={handleSaveHeroImage}
+                              disabled={isSavingHeroImage}
+                              className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#17191B] bg-[#B79A68] hover:bg-[#CBB17F] px-4 py-1.5 rounded transition-colors shadow cursor-pointer disabled:opacity-50"
+                            >
+                              {isSavingHeroImage ? (
+                                <>
+                                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                  <span>Saving...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Save className="w-3.5 h-3.5" />
+                                  <span>Save Changes</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="border border-dashed border-[#2D3237] rounded-lg p-5 flex flex-col items-center justify-center text-center bg-[#17191B]/40 space-y-2">
+                          <Upload className="w-7 h-7 text-[#8E8B82] opacity-70" />
+                          <h4 className="text-xs font-semibold text-[#DFD9CB]">
+                            Upload New Hero Background
+                          </h4>
+                          <p className="text-[11px] text-[#8E8B82] max-w-xs leading-relaxed">
+                            Supports JPG, JPEG, PNG, or WebP up to 10 MB. Changes will immediately be reflected on the public homepage.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => heroFileInputRef.current?.click()}
+                            className="text-xs text-[#B79A68] hover:text-[#CBB17F] font-semibold underline underline-offset-4 cursor-pointer pt-1"
+                          >
+                            Browse file from device
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-xs uppercase tracking-wider text-[#DFD9CB] mb-1 font-semibold">
-                      Main Headline
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.headline || ''}
-                      onChange={(e) => handleInputChange('headline', e.target.value)}
-                      className="w-full bg-[#17191B] border border-[#2D3237] text-xs text-[#F5F1E8] p-2.5 rounded focus:border-[#B79A68] focus:outline-none font-serif text-sm"
-                    />
-                  </div>
+                  {/* --- TEXT CONTENT FIELDS --- */}
+                  <div className="space-y-4 pt-2">
+                    <div>
+                      <label className="block text-xs uppercase tracking-wider text-[#DFD9CB] mb-1 font-semibold">
+                        Eyebrow / Badge Text
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.badge ?? formData.eyebrow ?? ''}
+                        onChange={(e) => {
+                          handleInputChange('badge', e.target.value);
+                          handleInputChange('eyebrow', e.target.value);
+                        }}
+                        placeholder="e.g. Artisanal Stonemasonry · Zimbabwe"
+                        className="w-full bg-[#17191B] border border-[#2D3237] text-xs text-[#F5F1E8] p-2.5 rounded focus:border-[#B79A68] focus:outline-none"
+                      />
+                    </div>
 
-                  <div>
-                    <label className="block text-xs uppercase tracking-wider text-[#DFD9CB] mb-1 font-semibold">
-                      Subheadline / Supporting Narrative
-                    </label>
-                    <textarea
-                      rows={3}
-                      value={formData.subheadline || ''}
-                      onChange={(e) => handleInputChange('subheadline', e.target.value)}
-                      className="w-full bg-[#17191B] border border-[#2D3237] text-xs text-[#F5F1E8] p-2.5 rounded focus:border-[#B79A68] focus:outline-none"
-                    />
+                    <div>
+                      <label className="block text-xs uppercase tracking-wider text-[#DFD9CB] mb-1 font-semibold">
+                        Main Headline
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.title ?? formData.headline ?? ''}
+                        onChange={(e) => {
+                          handleInputChange('title', e.target.value);
+                          handleInputChange('headline', e.target.value);
+                        }}
+                        placeholder="e.g. Stone That Speaks Beyond Time."
+                        className="w-full bg-[#17191B] border border-[#2D3237] text-xs text-[#F5F1E8] p-2.5 rounded focus:border-[#B79A68] focus:outline-none font-serif text-sm"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs uppercase tracking-wider text-[#DFD9CB] mb-1 font-semibold">
+                        Subheadline / Supporting Narrative
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={formData.subtitle ?? formData.subheadline ?? ''}
+                        onChange={(e) => {
+                          handleInputChange('subtitle', e.target.value);
+                          handleInputChange('subheadline', e.target.value);
+                        }}
+                        placeholder="e.g. Bespoke Zimbabwean black granite memorials, custom tombstone craft..."
+                        className="w-full bg-[#17191B] border border-[#2D3237] text-xs text-[#F5F1E8] p-2.5 rounded focus:border-[#B79A68] focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs uppercase tracking-wider text-[#DFD9CB] mb-1 font-semibold">
+                        Detailed Description Paragraph
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={formData.description || ''}
+                        onChange={(e) => handleInputChange('description', e.target.value)}
+                        placeholder="e.g. Every memorial, countertop, and window sill is custom-crafted to your family or architectural specifications..."
+                        className="w-full bg-[#17191B] border border-[#2D3237] text-xs text-[#F5F1E8] p-2.5 rounded focus:border-[#B79A68] focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-[11px] uppercase tracking-wider text-[#DFD9CB] mb-1 font-semibold">
+                          Primary Button Text
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.primaryButtonText || ''}
+                          onChange={(e) => handleInputChange('primaryButtonText', e.target.value)}
+                          placeholder="Explore Our Gallery"
+                          className="w-full bg-[#17191B] border border-[#2D3237] text-xs text-[#F5F1E8] p-2.5 rounded focus:border-[#B79A68] focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] uppercase tracking-wider text-[#DFD9CB] mb-1 font-semibold">
+                          Secondary Button Text
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.secondaryButtonText || ''}
+                          onChange={(e) => handleInputChange('secondaryButtonText', e.target.value)}
+                          placeholder="Request a Quote"
+                          className="w-full bg-[#17191B] border border-[#2D3237] text-xs text-[#F5F1E8] p-2.5 rounded focus:border-[#B79A68] focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] uppercase tracking-wider text-[#DFD9CB] mb-1 font-semibold">
+                          WhatsApp Button Text
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.whatsappButtonText || ''}
+                          onChange={(e) => handleInputChange('whatsappButtonText', e.target.value)}
+                          placeholder="Chat on WhatsApp"
+                          className="w-full bg-[#17191B] border border-[#2D3237] text-xs text-[#F5F1E8] p-2.5 rounded focus:border-[#B79A68] focus:outline-none"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

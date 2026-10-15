@@ -1,5 +1,8 @@
 import { WebsiteContent } from '../types/content';
 
+export const DEFAULT_HERO_IMAGE_URL =
+  'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&q=80&w=2000';
+
 export const DEFAULT_WEBSITE_CONTENT: WebsiteContent = {
   announcement: {
     text: "Natural Zimbabwean Black Granite · Memorial Consultations & Nationwide Installation Across Zimbabwe · Direct WhatsApp: +263 78 696 7793",
@@ -15,6 +18,9 @@ export const DEFAULT_WEBSITE_CONTENT: WebsiteContent = {
     primaryButtonText: "Explore Our Gallery",
     secondaryButtonText: "Request a Quote",
     whatsappButtonText: "Chat on WhatsApp",
+    backgroundImageUrl: DEFAULT_HERO_IMAGE_URL,
+    heroImageUrl: DEFAULT_HERO_IMAGE_URL,
+    imageAlt: "Dignified stone memorial structure standing serenely under soft ambient sky",
   },
   about: {
     title: "Crafted in Stone. Remembered Forever.",
