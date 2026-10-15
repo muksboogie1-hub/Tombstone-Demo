@@ -8,6 +8,7 @@ import { useContent } from '../context/ContentContext';
 import { Product } from '../types/content';
 import { SITE_CONFIG, getWhatsAppUrl } from '../config/siteConfig';
 import { DEFAULT_HERO_IMAGE_URL } from '../data/defaultContent';
+import { getImageDisplayStyles } from '../utils/imageStyles';
 
 export function HomePage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -39,7 +40,8 @@ export function HomePage() {
           <img
             src={hero?.backgroundImageUrl || hero?.heroImageUrl || DEFAULT_HERO_IMAGE_URL}
             alt={hero?.imageAlt || "Dignified stone memorial structure standing serenely under soft ambient sky"}
-            className="w-full h-full object-cover object-center filter brightness-45 contrast-110"
+            style={getImageDisplayStyles(hero?.imageSettings)}
+            className="w-full h-full filter brightness-45 contrast-110 select-none transition-transform duration-300"
             loading="eager"
             onError={(e) => {
               if (e.currentTarget.src !== DEFAULT_HERO_IMAGE_URL) {

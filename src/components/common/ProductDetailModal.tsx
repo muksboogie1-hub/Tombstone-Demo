@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { X, MessageCircle, FileText, Info, ExternalLink, Tag } from 'lucide-react';
 import { Product } from '../../types/content';
 import { getProductWhatsAppUrl } from '../../config/siteConfig';
+import { getImageDisplayStyles } from '../../utils/imageStyles';
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -71,12 +72,13 @@ export function ProductDetailModal({ product, onClose }: ProductDetailModalProps
         </button>
 
         {/* Product Image Column */}
-        <div className="md:w-1/2 relative bg-[#121415] min-h-[280px] md:min-h-full">
+        <div className="md:w-1/2 relative bg-[#121415] min-h-[280px] md:min-h-full overflow-hidden flex items-center justify-center">
           <img
             src={product.imageUrl}
             alt={product.imageAlt}
             loading="eager"
-            className="w-full h-full object-cover object-center max-h-[460px] md:max-h-none"
+            style={getImageDisplayStyles(product.imageSettings)}
+            className="w-full h-full max-h-[460px] md:max-h-none select-none transition-transform duration-300"
           />
           {product.imageAttribution?.photographer && (
             <div className="absolute bottom-2 left-2 bg-[#17191B]/90 backdrop-blur-xs text-[10px] text-[#B9B5AC] px-2.5 py-1 rounded border border-[#2D3237]">

@@ -1,3 +1,5 @@
+import { ImageDisplaySettings } from '../utils/imageStyles';
+
 export interface Product {
   id: string;
   slug: string;
@@ -20,6 +22,7 @@ export interface Product {
     sizingNote: string;
   };
   featured: boolean;
+  imageSettings?: ImageDisplaySettings;
 }
 
 export const PRODUCTS: Product[] = [
@@ -46,6 +49,12 @@ export const PRODUCTS: Product[] = [
       sizingNote: 'Standard single plot dimensions or bespoke family plot sizes available upon consultation.',
     },
     featured: true,
+    imageSettings: {
+      zoom: 100,
+      posX: 50,
+      posY: 50,
+      fit: 'contain',
+    },
   },
   {
     id: 'ts-02',
@@ -69,6 +78,12 @@ export const PRODUCTS: Product[] = [
       sizingNote: 'Single headstone with matching sub-base. Contact us to discuss available options.',
     },
     featured: true,
+    imageSettings: {
+      zoom: 135,
+      posX: 50,
+      posY: 22,
+      fit: 'cover',
+    },
   },
   {
     id: 'ts-03',

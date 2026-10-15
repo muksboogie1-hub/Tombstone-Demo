@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS public.products (
     image_alt TEXT NOT NULL,
     image_attribution JSONB NOT NULL DEFAULT '{}'::jsonb,
     specifications JSONB NOT NULL DEFAULT '{}'::jsonb,
+    image_settings JSONB NOT NULL DEFAULT '{"zoom":100,"posX":50,"posY":50,"fit":"cover"}'::jsonb,
     featured BOOLEAN NOT NULL DEFAULT false,
     price_display_mode TEXT NOT NULL DEFAULT 'quotation_only' CHECK (price_display_mode IN ('quotation_only', 'fixed_price', 'starting_from')),
     price_amount NUMERIC(10, 2),
@@ -69,6 +70,9 @@ CREATE TABLE IF NOT EXISTS public.products (
     updated_by UUID,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Idempotent column upgrade for existing database instances
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS image_settings JSONB DEFAULT '{"zoom":100,"posX":50,"posY":50,"fit":"cover"}'::jsonb;
 
 -- Create Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_products_category ON public.products(category);

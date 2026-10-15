@@ -1,4 +1,7 @@
 import { Product as BaseProduct } from '../data/products';
+import { ImageDisplaySettings } from '../utils/imageStyles';
+
+export type { ImageDisplaySettings };
 
 export interface Product extends BaseProduct {
   priceDisplayMode?: 'quotation_only' | 'fixed_price' | 'starting_from';
@@ -7,6 +10,7 @@ export interface Product extends BaseProduct {
   priceNote?: string;
   isPublished?: boolean;
   sortOrder?: number;
+  imageSettings?: ImageDisplaySettings;
 }
 
 export interface AnnouncementContent {
@@ -30,6 +34,7 @@ export interface HeroContent {
   eyebrow?: string;
   headline?: string;
   subheadline?: string;
+  imageSettings?: ImageDisplaySettings;
 }
 
 export interface AboutContent {

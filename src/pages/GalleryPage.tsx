@@ -7,6 +7,7 @@ import { ProductDetailModal } from '../components/common/ProductDetailModal';
 import { useContent } from '../context/ContentContext';
 import { Product } from '../types/content';
 import { getProductWhatsAppUrl } from '../config/siteConfig';
+import { getImageDisplayStyles } from '../utils/imageStyles';
 
 type CategoryFilter = 'All Designs' | 'Tombstones' | 'Countertops & Tables' | 'Window Sills';
 
@@ -129,14 +130,15 @@ export function GalleryPage() {
                 }`}
               >
                 {/* Image Container with Editorial Aspect Ratio */}
-                <div className="relative aspect-4/3 overflow-hidden bg-[#121415]">
+                <div className="relative aspect-4/3 overflow-hidden bg-[#121415] flex items-center justify-center">
                   <img
                     src={product.imageUrl}
                     alt={product.imageAlt}
                     loading={idx < 3 ? 'eager' : 'lazy'}
-                    className="w-full h-full object-cover object-center group-hover:scale-103 transition-transform duration-500 ease-out"
+                    style={getImageDisplayStyles(product.imageSettings)}
+                    className="w-full h-full select-none transition-transform duration-300 ease-out"
                   />
-                  <div className="absolute inset-0 bg-linear-to-t from-[#1D2023] via-transparent to-transparent opacity-60"></div>
+                  <div className="absolute inset-0 bg-linear-to-t from-[#1D2023] via-transparent to-transparent opacity-60 pointer-events-none"></div>
 
                   {/* Photo Attribution Corner */}
                   <span className="absolute top-2 left-2 bg-[#17191B]/80 text-[10px] text-[#B9B5AC] px-2 py-0.5 rounded backdrop-blur-xs">

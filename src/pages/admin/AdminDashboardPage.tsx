@@ -48,6 +48,8 @@ import {
 } from '../../services/authService';
 import { SEOHead } from '../../components/common/SEOHead';
 import { ConfigureCredentialsModal } from '../../components/common/ConfigureCredentialsModal';
+import { ImageDisplayControls } from '../../components/admin/ImageDisplayControls';
+import { getImageDisplayStyles } from '../../utils/imageStyles';
 
 type Tab = 'content' | 'products' | 'media' | 'team' | 'system';
 type ContentSection = keyof WebsiteContent;
@@ -412,12 +414,26 @@ export function AdminDashboardPage() {
         materialOptions: 'Zimbabwe Black Granite',
         sizingNote: 'Standard single plot dimensions or custom family plot',
       },
+      imageSettings: {
+        zoom: 100,
+        posX: 50,
+        posY: 50,
+        fit: 'cover',
+      },
     });
     setIsProductModalOpen(true);
   };
 
   const handleOpenEditProduct = (p: Product) => {
-    setEditingProduct({ ...p });
+    setEditingProduct({
+      ...p,
+      imageSettings: p.imageSettings || {
+        zoom: 100,
+        posX: 50,
+        posY: 50,
+        fit: 'cover',
+      },
+    });
     setIsProductModalOpen(true);
   };
 
@@ -1241,6 +1257,21 @@ WHERE LOWER(a.email) = LOWER(u.email)
                         </div>
                       )}
                     </div>
+
+                    {/* Hero Image Zoom & Position Controls */}
+                    <div className="pt-2">
+                      <ImageDisplayControls
+                        imageUrl={pendingHeroPreviewUrl || activeHeroImage}
+                        imageAlt="Homepage Hero Background"
+                        settings={formData.imageSettings || content.hero?.imageSettings}
+                        onChange={(newSettings) =>
+                          setFormData({ ...formData, imageSettings: newSettings })
+                        }
+                        aspectRatioClass="aspect-16/9"
+                        label="Hero Background Framing & Positioning"
+                        previewNote="Live preview for the cinematic homepage hero background. Use Zoom and Position sliders or drag to align the focal stone structure."
+                      />
+                    </div>
                   </div>
 
                   {/* --- TEXT CONTENT FIELDS --- */}
@@ -1511,11 +1542,12 @@ WHERE LOWER(a.email) = LOWER(u.email)
                   key={p.id}
                   className="bg-[#1D2023] border border-[#2D3237] rounded-lg overflow-hidden flex flex-col group hover:border-[#B79A68]/40 transition-all shadow-md"
                 >
-                  <div className="relative h-48 bg-[#17191B] overflow-hidden">
+                  <div className="relative h-48 bg-[#121415] overflow-hidden flex items-center justify-center">
                     <img
                       src={p.imageUrl}
                       alt={p.imageAlt || p.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      style={getImageDisplayStyles(p.imageSettings)}
+                      className="w-full h-full select-none transition-transform duration-300"
                     />
                     <div className="absolute top-2 left-2 flex gap-1 flex-wrap">
                       <span className="bg-[#121415]/80 backdrop-blur-sm border border-[#3E4348] text-[#DFD9CB] text-[10px] font-semibold px-2 py-0.5 rounded">
@@ -1524,6 +1556,16 @@ WHERE LOWER(a.email) = LOWER(u.email)
                       {p.featured && (
                         <span className="bg-[#B79A68] text-[#17191B] text-[10px] font-bold px-2 py-0.5 rounded">
                           Featured
+                        </span>
+                      )}
+                      {p.imageSettings?.fit === 'contain' && (
+                        <span className="bg-[#121415]/90 border border-[#B79A68]/60 text-[#B79A68] text-[10px] font-mono px-1.5 py-0.5 rounded">
+                          Contain
+                        </span>
+                      )}
+                      {p.imageSettings?.zoom && p.imageSettings.zoom !== 100 && (
+                        <span className="bg-[#121415]/90 border border-[#3E4348] text-[#DFD9CB] text-[10px] font-mono px-1.5 py-0.5 rounded">
+                          {p.imageSettings.zoom}% Zoom
                         </span>
                       )}
                     </div>
@@ -2050,6 +2092,23 @@ WHERE LOWER(a.email) = LOWER(u.email)
                   </div>
                 </div>
               </div>
+
+              {/* Individual Image Zoom & Position Controls */}
+              {editingProduct.imageUrl && (
+                <div className="pt-2">
+                  <ImageDisplayControls
+                    imageUrl={editingProduct.imageUrl}
+                    imageAlt={editingProduct.name || 'Product photo'}
+                    settings={editingProduct.imageSettings}
+                    onChange={(newSettings) =>
+                      setEditingProduct({ ...editingProduct, imageSettings: newSettings })
+                    }
+                    aspectRatioClass="aspect-4/3"
+                    label="Product Framing & Display Controls"
+                    previewNote="Individual zoom & position settings for this product. Matches live website framing exactly."
+                  />
+                </div>
+              )}
 
               {/* Pricing settings */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

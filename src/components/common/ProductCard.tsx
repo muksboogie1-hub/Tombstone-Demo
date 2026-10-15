@@ -1,6 +1,7 @@
 import { Eye, MessageCircle, ExternalLink } from 'lucide-react';
 import { Product } from '../../types/content';
 import { getProductWhatsAppUrl } from '../../config/siteConfig';
+import { getImageDisplayStyles } from '../../utils/imageStyles';
 
 interface ProductCardProps {
   product: Product;
@@ -19,14 +20,15 @@ export function ProductCard({ product, onSelect }: ProductCardProps) {
   return (
     <article className="bg-[#1D2023] border border-[#2D3237] hover:border-[#B79A68]/50 transition-all duration-300 rounded overflow-hidden flex flex-col group">
       {/* Product Image Frame */}
-      <div className="relative aspect-4/3 overflow-hidden bg-[#121415]">
+      <div className="relative aspect-4/3 overflow-hidden bg-[#121415] flex items-center justify-center">
         <img
           src={product.imageUrl}
           alt={product.imageAlt}
           loading="lazy"
-          className="w-full h-full object-cover object-center group-hover:scale-103 transition-transform duration-500 ease-out"
+          style={getImageDisplayStyles(product.imageSettings)}
+          className="w-full h-full select-none transition-transform duration-300 ease-out"
         />
-        <div className="absolute inset-0 bg-linear-to-t from-[#1D2023] via-transparent to-transparent opacity-60"></div>
+        <div className="absolute inset-0 bg-linear-to-t from-[#1D2023] via-transparent to-transparent opacity-60 pointer-events-none"></div>
         
         {/* Quick View Overlay Button */}
         <button

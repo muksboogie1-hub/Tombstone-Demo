@@ -44,6 +44,12 @@ export function mapRowToProduct(row: any): Product {
     priceNote: row.price_note || '',
     isPublished: row.is_published !== false,
     sortOrder: row.sort_order ?? 0,
+    imageSettings: row.image_settings || row.specifications?.imageSettings || {
+      zoom: 100,
+      posX: 50,
+      posY: 50,
+      fit: 'cover',
+    },
   };
 }
 
@@ -61,7 +67,18 @@ export function mapProductToRow(product: Partial<Product>, currentUserId?: strin
   if (product.imageUrl !== undefined) row.image_url = product.imageUrl;
   if (product.imageAlt !== undefined) row.image_alt = product.imageAlt;
   if (product.imageAttribution !== undefined) row.image_attribution = product.imageAttribution;
-  if (product.specifications !== undefined) row.specifications = product.specifications;
+  
+  // Resilient persistence: store in specifications as well as image_settings
+  if (product.specifications !== undefined || product.imageSettings !== undefined) {
+    row.specifications = {
+      ...(product.specifications || {}),
+      ...(product.imageSettings ? { imageSettings: product.imageSettings } : {}),
+    };
+  }
+  if (product.imageSettings !== undefined) {
+    row.image_settings = product.imageSettings;
+  }
+  
   if (product.featured !== undefined) row.featured = product.featured;
   if (product.priceDisplayMode !== undefined) row.price_display_mode = product.priceDisplayMode;
   if (product.priceAmount !== undefined) row.price_amount = product.priceAmount;
@@ -213,6 +230,12 @@ export async function createProduct(
     priceNote: product.priceNote || '',
     isPublished: product.isPublished !== false,
     sortOrder: product.sortOrder ?? 0,
+    imageSettings: product.imageSettings || {
+      zoom: 100,
+      posX: 50,
+      posY: 50,
+      fit: 'cover',
+    },
   };
 
   // Preview sandbox local fallback
@@ -233,7 +256,15 @@ export async function createProduct(
   try {
     const user = await getCurrentAdminUser();
     const row = mapProductToRow(completeProduct, user?.id);
-    const { data, error } = await client.from('products').insert(row).select().single();
+    let { data, error } = await client.from('products').insert(row).select().single();
+
+    // If image_settings column is not yet migrated in Supabase, retry saving via specifications JSONB
+    if (error && (error.code === '42703' || error.message?.includes('image_settings'))) {
+      delete row.image_settings;
+      const retry = await client.from('products').insert(row).select().single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       // Preserve locally so user's draft is not lost
@@ -292,7 +323,15 @@ export async function updateProduct(
     const row = mapProductToRow(updates, user?.id);
     delete row.id; // Prevent modifying primary key
 
-    const { data, error } = await client.from('products').update(row).eq('id', id).select().single();
+    let { data, error } = await client.from('products').update(row).eq('id', id).select().single();
+
+    // If image_settings column is not yet migrated in Supabase, retry saving via specifications JSONB
+    if (error && (error.code === '42703' || error.message?.includes('image_settings'))) {
+      delete row.image_settings;
+      const retry = await client.from('products').update(row).eq('id', id).select().single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       throw new Error(formatSupabaseError(error));
