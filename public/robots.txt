@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://velquarath-stoneworks-demo.co.zw/sitemap.xml

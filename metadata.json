@@ -1,0 +1,6 @@
+{
+  "name": "Velquarath Stoneworks - Premium Tombstone & Granite Works",
+  "description": "Velquarath Stoneworks — Premium tombstones, granite memorials, countertops, and architectural stonework in Zimbabwe.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
