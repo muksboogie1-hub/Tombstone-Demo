@@ -26,6 +26,7 @@ import {
   Settings,
   Sparkles,
   X,
+  Layers,
 } from 'lucide-react';
 import { isSupabaseConfigured, testSupabaseConnection, getSupabaseConfigStatus } from '../../lib/supabaseClient';
 import { useContent } from '../../context/ContentContext';
@@ -50,6 +51,7 @@ import { SEOHead } from '../../components/common/SEOHead';
 import { ConfigureCredentialsModal } from '../../components/common/ConfigureCredentialsModal';
 import { ImageDisplayControls } from '../../components/admin/ImageDisplayControls';
 import { getImageDisplayStyles } from '../../utils/imageStyles';
+import { HomepageCardsEditor } from '../../components/admin/HomepageCardsEditor';
 
 type Tab = 'content' | 'products' | 'media' | 'team' | 'system';
 type ContentSection = keyof WebsiteContent;
@@ -913,13 +915,28 @@ WHERE LOWER(a.email) = LOWER(u.email)
           <button
             onClick={() => setActiveTab('content')}
             className={`py-3 px-4 text-xs font-semibold uppercase tracking-wider flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors cursor-pointer ${
-              activeTab === 'content'
+              activeTab === 'content' && activeSection !== 'categories'
                 ? 'border-[#B79A68] text-[#B79A68] bg-[#1D2023]'
                 : 'border-transparent text-[#8E8B82] hover:text-[#DFD9CB]'
             }`}
           >
             <FileText className="w-4 h-4" />
             <span>Content Editor</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('content');
+              setActiveSection('categories');
+            }}
+            className={`py-3 px-4 text-xs font-semibold uppercase tracking-wider flex items-center gap-2 border-b-2 whitespace-nowrap transition-colors cursor-pointer ${
+              activeTab === 'content' && activeSection === 'categories'
+                ? 'border-[#B79A68] text-[#B79A68] bg-[#1D2023]'
+                : 'border-transparent text-[#8E8B82] hover:text-[#DFD9CB]'
+            }`}
+          >
+            <Layers className="w-4 h-4" />
+            <span>Homepage Cards</span>
           </button>
 
           <button
@@ -1006,6 +1023,7 @@ WHERE LOWER(a.email) = LOWER(u.email)
               <div className="bg-[#1D2023] border border-[#2D3237] rounded-lg p-1.5 space-y-1">
                 {[
                   { key: 'hero', label: 'Hero Header' },
+                  { key: 'categories', label: 'Homepage Category Cards' },
                   { key: 'announcement', label: 'Announcement Bar' },
                   { key: 'about', label: 'About & Story' },
                   { key: 'craftsmanship', label: 'Granite Craftsmanship' },
@@ -1045,7 +1063,7 @@ WHERE LOWER(a.email) = LOWER(u.email)
                     Editing Section
                   </span>
                   <h2 className="font-serif text-xl font-bold text-[#F5F1E8] uppercase tracking-wide">
-                    {String(activeSection)}
+                    {activeSection === 'categories' ? 'Homepage Category Cards' : String(activeSection)}
                   </h2>
                 </div>
 
@@ -1389,6 +1407,28 @@ WHERE LOWER(a.email) = LOWER(u.email)
                 </div>
               )}
 
+              {activeSection === 'categories' && (
+                <HomepageCardsEditor
+                  categories={content.categories}
+                  onSaveCategories={async (updatedCategories) => {
+                    const success = await updateContentSection('categories', updatedCategories);
+                    if (success) {
+                      setStatusMessage({
+                        type: 'success',
+                        text: 'Homepage Category Cards saved and published live to website.',
+                      });
+                      setTimeout(() => setStatusMessage(null), 4000);
+                    }
+                    return success;
+                  }}
+                  onResetToDefault={async () => {
+                    const success = await resetContentSection('categories');
+                    return success;
+                  }}
+                  isSavingGlobal={isSaving}
+                />
+              )}
+
               {activeSection === 'announcement' && (
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
@@ -1485,7 +1525,7 @@ WHERE LOWER(a.email) = LOWER(u.email)
                 </div>
               )}
 
-              {activeSection !== 'hero' && activeSection !== 'announcement' && activeSection !== 'contact' && (
+              {activeSection !== 'hero' && activeSection !== 'categories' && activeSection !== 'announcement' && activeSection !== 'contact' && (
                 <div className="space-y-3">
                   <p className="text-xs text-[#8E8B82]">
                     Structured JSON properties for this section:

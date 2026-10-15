@@ -72,7 +72,7 @@ export const PRODUCTS: Product[] = [
     shortDescription: 'A contemporary memorial concept with a deep reflective polished stone finish.',
     longDescription:
       'Engineered with clean architectural lines, this polished black granite memorial honors enduring memory with understated dignity. Features a spacious inscription area suitable for gold leaf or sandblasted lettering.',
-    imageUrl: 'https://images.unsplash.com/photo-1596280459345-42cf6ee2a106?auto=format&fit=crop&q=80&w=1200',
+    imageUrl: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=1200',
     imageAlt: 'Polished black granite gravestone monolith with clean reflective edges',
     imageAttribution: {
       photographer: 'David Billings',

@@ -53,16 +53,31 @@ export interface AboutContent {
   standardsPoint4: string;
 }
 
+export interface CategoryCardItem {
+  id: string; // 'tombstones' | 'countertops' | 'windowSills'
+  categoryLabel: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  imageAlt: string;
+  exploreButtonText: string;
+  exploreLink: string;
+  imageSettings?: ImageDisplaySettings;
+}
+
 export interface CategoriesContent {
   badge: string;
   title: string;
-  tombstonesHeading: string;
-  tombstonesDescription: string;
-  countertopsHeading: string;
-  countertopsDescription: string;
-  windowSillsHeading: string;
-  windowSillsDescription: string;
+  subtitle?: string;
+  cards: CategoryCardItem[];
+  tombstonesHeading?: string;
+  tombstonesDescription?: string;
+  countertopsHeading?: string;
+  countertopsDescription?: string;
+  windowSillsHeading?: string;
+  windowSillsDescription?: string;
 }
+
 
 export interface CraftsmanshipContent {
   badge: string;

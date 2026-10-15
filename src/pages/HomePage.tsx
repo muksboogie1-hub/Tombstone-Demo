@@ -7,7 +7,7 @@ import { ProductDetailModal } from '../components/common/ProductDetailModal';
 import { useContent } from '../context/ContentContext';
 import { Product } from '../types/content';
 import { SITE_CONFIG, getWhatsAppUrl } from '../config/siteConfig';
-import { DEFAULT_HERO_IMAGE_URL } from '../data/defaultContent';
+import { DEFAULT_HERO_IMAGE_URL, DEFAULT_CATEGORY_CARDS } from '../data/defaultContent';
 import { getImageDisplayStyles } from '../utils/imageStyles';
 
 export function HomePage() {
@@ -16,6 +16,9 @@ export function HomePage() {
 
   const hero = content.hero;
   const categories = content.categories;
+  const categoryCards = categories?.cards && categories.cards.length > 0
+    ? categories.cards
+    : DEFAULT_CATEGORY_CARDS;
 
   // Curated featured designs from live database or verified baseline
   const activeProducts = products.filter((p) => p.isPublished !== false);
@@ -121,116 +124,56 @@ export function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {/* Category 1: Tombstones */}
-          <div className="group relative bg-[#1D2023] border border-[#2D3237] hover:border-[#B79A68]/60 rounded overflow-hidden transition-all duration-300 flex flex-col justify-between">
-            <div className="relative aspect-16/10 overflow-hidden bg-[#121415]">
-              <img
-                src="https://images.unsplash.com/photo-1596280459345-42cf6ee2a106?auto=format&fit=crop&q=80&w=800"
-                alt="Polished black granite tombstone monument"
-                loading="lazy"
-                className="w-full h-full object-cover group-hover:scale-104 transition-transform duration-500 ease-out"
-              />
-              <div className="absolute inset-0 bg-linear-to-t from-[#1D2023] via-transparent to-transparent"></div>
-            </div>
+          {categoryCards.map((card, index) => {
+            const fallbackUrl = DEFAULT_CATEGORY_CARDS[index]?.imageUrl || DEFAULT_HERO_IMAGE_URL;
 
-            <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
-              <div>
-                <span className="text-[10px] uppercase tracking-widest text-[#B79A68] font-semibold block mb-1">
-                  Memorial Work
-                </span>
-                <h3 className="font-serif text-xl sm:text-2xl text-[#F5F1E8] font-bold group-hover:text-[#B79A68] transition-colors">
-                  {categories?.tombstonesHeading || 'Tombstones & Memorials'}
-                </h3>
-                <p className="text-xs text-[#B9B5AC] mt-2 leading-relaxed">
-                  {categories?.tombstonesDescription || 'Headstones, full kerb enclosures, tiered ledger stones, and cross memorials carved in deep Zimbabwean granite to honor family legacies.'}
-                </p>
+            return (
+              <div
+                key={card.id || index}
+                className="group relative bg-[#1D2023] border border-[#2D3237] hover:border-[#B79A68]/60 rounded overflow-hidden transition-all duration-300 flex flex-col justify-between"
+              >
+                <div className="relative aspect-16/10 overflow-hidden bg-[#121415]">
+                  <img
+                    src={card.imageUrl || fallbackUrl}
+                    alt={card.imageAlt || card.title}
+                    loading="lazy"
+                    style={getImageDisplayStyles(card.imageSettings)}
+                    className="w-full h-full object-cover group-hover:scale-104 transition-transform duration-500 ease-out"
+                    onError={(e) => {
+                      if (e.currentTarget.src !== fallbackUrl) {
+                        e.currentTarget.src = fallbackUrl;
+                      }
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-linear-to-t from-[#1D2023] via-transparent to-transparent pointer-events-none"></div>
+                </div>
+
+                <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
+                  <div>
+                    <span className="text-[10px] uppercase tracking-widest text-[#B79A68] font-semibold block mb-1">
+                      {card.categoryLabel}
+                    </span>
+                    <h3 className="font-serif text-xl sm:text-2xl text-[#F5F1E8] font-bold group-hover:text-[#B79A68] transition-colors">
+                      {card.title}
+                    </h3>
+                    <p className="text-xs text-[#B9B5AC] mt-2 leading-relaxed">
+                      {card.description}
+                    </p>
+                  </div>
+
+                  <div className="pt-2">
+                    <Link
+                      to={card.exploreLink || '/gallery'}
+                      className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#B79A68] group-hover:text-[#F5F1E8] transition-colors"
+                    >
+                      <span>{card.exploreButtonText || 'Explore'}</span>
+                      <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
+                    </Link>
+                  </div>
+                </div>
               </div>
-
-              <div className="pt-2">
-                <Link
-                  to="/tombstones"
-                  className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#B79A68] group-hover:text-[#F5F1E8] transition-colors"
-                >
-                  <span>Explore Tombstones</span>
-                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          {/* Category 2: Countertops & Tables */}
-          <div className="group relative bg-[#1D2023] border border-[#2D3237] hover:border-[#B79A68]/60 rounded overflow-hidden transition-all duration-300 flex flex-col justify-between">
-            <div className="relative aspect-16/10 overflow-hidden bg-[#121415]">
-              <img
-                src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=800"
-                alt="Bespoke granite kitchen island countertop"
-                loading="lazy"
-                className="w-full h-full object-cover group-hover:scale-104 transition-transform duration-500 ease-out"
-              />
-              <div className="absolute inset-0 bg-linear-to-t from-[#1D2023] via-transparent to-transparent"></div>
-            </div>
-
-            <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
-              <div>
-                <span className="text-[10px] uppercase tracking-widest text-[#B79A68] font-semibold block mb-1">
-                  Interior & Living
-                </span>
-                <h3 className="font-serif text-xl sm:text-2xl text-[#F5F1E8] font-bold group-hover:text-[#B79A68] transition-colors">
-                  {categories?.countertopsHeading || 'Countertops & Tables'}
-                </h3>
-                <p className="text-xs text-[#B9B5AC] mt-2 leading-relaxed">
-                  {categories?.countertopsDescription || 'Heat-resistant granite kitchen worktops, waterfall edge islands, bathroom vanity slabs, and solid stone outdoor dining tables.'}
-                </p>
-              </div>
-
-              <div className="pt-2">
-                <Link
-                  to="/countertops-tables"
-                  className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#B79A68] group-hover:text-[#F5F1E8] transition-colors"
-                >
-                  <span>Explore Countertops</span>
-                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          {/* Category 3: Window Sills */}
-          <div className="group relative bg-[#1D2023] border border-[#2D3237] hover:border-[#B79A68]/60 rounded overflow-hidden transition-all duration-300 flex flex-col justify-between">
-            <div className="relative aspect-16/10 overflow-hidden bg-[#121415]">
-              <img
-                src="https://images.unsplash.com/photo-1600585152220-90363fe7e115?auto=format&fit=crop&q=80&w=800"
-                alt="Polished stone window sill architectural trim"
-                loading="lazy"
-                className="w-full h-full object-cover group-hover:scale-104 transition-transform duration-500 ease-out"
-              />
-              <div className="absolute inset-0 bg-linear-to-t from-[#1D2023] via-transparent to-transparent"></div>
-            </div>
-
-            <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
-              <div>
-                <span className="text-[10px] uppercase tracking-widest text-[#B79A68] font-semibold block mb-1">
-                  Architectural Masonry
-                </span>
-                <h3 className="font-serif text-xl sm:text-2xl text-[#F5F1E8] font-bold group-hover:text-[#B79A68] transition-colors">
-                  {categories?.windowSillsHeading || 'Window Sills'}
-                </h3>
-                <p className="text-xs text-[#B9B5AC] mt-2 leading-relaxed">
-                  {categories?.windowSillsDescription || 'Durable granite exterior sills with water-drip grooves, honed interior threshold reveals, and bullnose architectural trim.'}
-                </p>
-              </div>
-
-              <div className="pt-2">
-                <Link
-                  to="/window-sills"
-                  className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#B79A68] group-hover:text-[#F5F1E8] transition-colors"
-                >
-                  <span>Explore Window Sills</span>
-                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
-                </Link>
-              </div>
-            </div>
-          </div>
+            );
+          })}
         </div>
       </section>
 

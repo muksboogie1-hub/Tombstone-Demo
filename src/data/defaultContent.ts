@@ -1,7 +1,40 @@
-import { WebsiteContent } from '../types/content';
+import { WebsiteContent, CategoryCardItem } from '../types/content';
 
 export const DEFAULT_HERO_IMAGE_URL =
   'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&q=80&w=2000';
+
+export const DEFAULT_CATEGORY_CARDS: CategoryCardItem[] = [
+  {
+    id: 'tombstones',
+    categoryLabel: 'Memorial Work',
+    title: 'Tombstones & Memorials',
+    description: 'Headstones, full kerb enclosures, tiered ledger stones, and cross memorials carved in deep Zimbabwean granite to honor family legacies.',
+    imageUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&q=80&w=800',
+    imageAlt: 'Polished black granite tombstone monument',
+    exploreButtonText: 'Explore Tombstones',
+    exploreLink: '/tombstones',
+  },
+  {
+    id: 'countertops',
+    categoryLabel: 'Interior & Living',
+    title: 'Countertops & Tables',
+    description: 'Heat-resistant granite kitchen worktops, waterfall edge islands, bathroom vanity slabs, and solid stone outdoor dining tables.',
+    imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=800',
+    imageAlt: 'Bespoke granite kitchen island countertop',
+    exploreButtonText: 'Explore Countertops',
+    exploreLink: '/countertops-tables',
+  },
+  {
+    id: 'windowSills',
+    categoryLabel: 'Architectural Masonry',
+    title: 'Window Sills',
+    description: 'Durable granite exterior sills with water-drip grooves, honed interior threshold reveals, and bullnose architectural trim.',
+    imageUrl: 'https://images.unsplash.com/photo-1600585152220-90363fe7e115?auto=format&fit=crop&q=80&w=800',
+    imageAlt: 'Polished stone window sill architectural trim',
+    exploreButtonText: 'Explore Window Sills',
+    exploreLink: '/window-sills',
+  },
+];
 
 export const DEFAULT_WEBSITE_CONTENT: WebsiteContent = {
   announcement: {
@@ -40,12 +73,14 @@ export const DEFAULT_WEBSITE_CONTENT: WebsiteContent = {
   categories: {
     badge: "Stone Masonry Disciplines",
     title: "Featured Categories",
+    subtitle: "Precision stonework tailored for solemn family remembrance and refined architectural installations.",
+    cards: DEFAULT_CATEGORY_CARDS,
     tombstonesHeading: "Tombstones & Memorials",
-    tombstonesDescription: "Solemn, enduring commemorative designs crafted from high-density Zimbabwean black granite. Sized to cemetery bylaws.",
+    tombstonesDescription: "Headstones, full kerb enclosures, tiered ledger stones, and cross memorials carved in deep Zimbabwean granite to honor family legacies.",
     countertopsHeading: "Countertops & Tables",
-    countertopsDescription: "Precision-machined kitchen slabs, mitred waterfall islands, and weather-hardy outdoor stone dining tables.",
+    countertopsDescription: "Heat-resistant granite kitchen worktops, waterfall edge islands, bathroom vanity slabs, and solid stone outdoor dining tables.",
     windowSillsHeading: "Window Sills",
-    windowSillsDescription: "Architectural granite sills with integrated water-drip grooves to protect exterior brickwork from rain ingress.",
+    windowSillsDescription: "Durable granite exterior sills with water-drip grooves, honed interior threshold reveals, and bullnose architectural trim.",
   },
   craftsmanship: {
     badge: "Material Sourcing & Standards",

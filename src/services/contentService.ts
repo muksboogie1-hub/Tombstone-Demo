@@ -37,6 +37,41 @@ async function isSupabaseSession(): Promise<boolean> {
   }
 }
 
+export function normalizeCategories(cat?: any): any {
+  const base = DEFAULT_WEBSITE_CONTENT.categories;
+  if (!cat || typeof cat !== 'object') return base;
+
+  const rawCards = Array.isArray(cat.cards) ? cat.cards : [];
+  const defaultCards = base.cards || [];
+
+  const normalizedCards = defaultCards.map((defaultCard) => {
+    const existing = rawCards.find((c: any) => c.id === defaultCard.id) || {};
+    let imageUrl = existing.imageUrl || defaultCard.imageUrl;
+    // Fix broken tombstone image if referencing dead 404 URL
+    if (imageUrl && imageUrl.includes('photo-1596280459345-42cf6ee2a106')) {
+      imageUrl = defaultCard.imageUrl;
+    }
+
+    return {
+      id: defaultCard.id,
+      categoryLabel: existing.categoryLabel || defaultCard.categoryLabel,
+      title: existing.title || (defaultCard.id === 'tombstones' ? cat.tombstonesHeading : defaultCard.id === 'countertops' ? cat.countertopsHeading : cat.windowSillsHeading) || defaultCard.title,
+      description: existing.description || (defaultCard.id === 'tombstones' ? cat.tombstonesDescription : defaultCard.id === 'countertops' ? cat.countertopsDescription : cat.windowSillsDescription) || defaultCard.description,
+      imageUrl,
+      imageAlt: existing.imageAlt || defaultCard.imageAlt,
+      exploreButtonText: existing.exploreButtonText || defaultCard.exploreButtonText,
+      exploreLink: existing.exploreLink || defaultCard.exploreLink,
+      imageSettings: existing.imageSettings || defaultCard.imageSettings,
+    };
+  });
+
+  return {
+    ...base,
+    ...cat,
+    cards: normalizedCards,
+  };
+}
+
 /**
  * Fetches all website content sections with local caching and offline fallback.
  * Merges with default baseline so every section is always reliably populated.
@@ -49,7 +84,9 @@ export async function fetchWebsiteContent(): Promise<ContentFetchResult> {
         if (cached) {
           const parsed = JSON.parse(cached);
           if (parsed && typeof parsed === 'object') {
-            return { ...DEFAULT_WEBSITE_CONTENT, ...parsed };
+            const merged = { ...DEFAULT_WEBSITE_CONTENT, ...parsed };
+            merged.categories = normalizeCategories(merged.categories);
+            return merged;
           }
         }
       } catch {
@@ -103,10 +140,14 @@ export async function fetchWebsiteContent(): Promise<ContentFetchResult> {
     for (const row of data) {
       const sectionKey = row.key as keyof WebsiteContent;
       if (SECTION_KEYS.includes(sectionKey) && row.value) {
-        merged[sectionKey] = {
-          ...DEFAULT_WEBSITE_CONTENT[sectionKey],
-          ...row.value,
-        };
+        if (sectionKey === 'categories') {
+          merged.categories = normalizeCategories(row.value);
+        } else {
+          merged[sectionKey] = {
+            ...DEFAULT_WEBSITE_CONTENT[sectionKey],
+            ...row.value,
+          };
+        }
       }
     }
 
@@ -271,60 +312,146 @@ export async function uploadHeroImage(file: File): Promise<{ url: string | null;
   const hasLive = await isSupabaseSession();
   const client = getSupabaseClient();
 
-  // If in Preview Sandbox or client missing, return preview URL
-  if (!hasLive || !client) {
-    return { url: previewUrl, error: null };
+  // If live authenticated Supabase session exists, try Supabase Storage first
+  if (hasLive && client) {
+    try {
+      const fileExt = ext || 'jpg';
+      const cleanExt = fileExt.replace(/[^a-z0-9]/g, '');
+      const fileName = `hero-${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${cleanExt}`;
+      const filePath = `hero/${fileName}`;
+
+      const { data, error } = await client.storage
+        .from('website-assets')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+        });
+
+      if (!error && data?.path) {
+        const { data: publicUrlData } = client.storage.from('website-assets').getPublicUrl(data.path);
+        return { url: publicUrlData.publicUrl, error: null };
+      }
+    } catch {
+      // Supabase upload failed, fallback to server upload
+    }
   }
 
+  // Next, upload to persistent server file endpoint /api/upload
   try {
-    const fileExt = ext || 'jpg';
-    const cleanExt = fileExt.replace(/[^a-z0-9]/g, '');
-    const fileName = `hero-${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${cleanExt}`;
-    const filePath = `hero/${fileName}`;
-
-    const { data, error } = await client.storage
-      .from('website-assets')
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false,
-      });
-
-    if (error) {
-      const isMissingBucket =
-        error.message?.toLowerCase().includes('bucket not found') ||
-        (error as any).statusCode === '404' ||
-        (error as any).error?.toLowerCase?.().includes('bucket not found');
-
-      if (isMissingBucket) {
-        try {
-          const { error: createErr } = await client.storage.createBucket('website-assets', {
-            public: true,
-          });
-          if (!createErr) {
-            const retry = await client.storage.from('website-assets').upload(filePath, file);
-            if (!retry.error && retry.data) {
-              const { data: retryPub } = client.storage.from('website-assets').getPublicUrl(retry.data.path);
-              return { url: retryPub.publicUrl, error: null };
-            }
-          }
-        } catch {
-          // create failed
-        }
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filename: file.name,
+        dataUrl: previewUrl,
+        folder: 'hero',
+      }),
+    });
+    if (res.ok) {
+      const resJson = await res.json();
+      if (resJson.success && resJson.url) {
+        return { url: resJson.url, error: null };
       }
-
-      // If storage upload fails due to RLS or permissions, provide data URL preview with error detail
-      return {
-        url: previewUrl,
-        error: new Error(formatSupabaseError(error)),
-      };
     }
+  } catch {
+    // server upload failed
+  }
 
-    const { data: publicUrlData } = client.storage.from('website-assets').getPublicUrl(data.path);
-    return { url: publicUrlData.publicUrl, error: null };
-  } catch (err: any) {
+  // Preview sandbox fallback
+  return { url: previewUrl, error: null };
+}
+
+/**
+ * Admin: Upload or replace a category card image.
+ * Uses persistent storage:
+ * 1. Supabase Storage bucket 'website-assets' (if live authenticated Supabase session exists)
+ * 2. Dedicated server endpoint /api/upload (which writes permanently to public/uploads/categories/)
+ * 3. Base64 data URL fallback if both server and Supabase are unreachable.
+ */
+export async function uploadCategoryCardImage(
+  file: File,
+  cardId: string
+): Promise<{ url: string | null; error: Error | null }> {
+  // Validate MIME type
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg', 'image/gif'];
+  const ext = file.name.split('.').pop()?.toLowerCase() || '';
+  const isAllowedExt = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext);
+
+  if (!allowedTypes.includes(file.type.toLowerCase()) && !isAllowedExt) {
     return {
-      url: previewUrl,
-      error: err instanceof Error ? err : new Error(String(err)),
+      url: null,
+      error: new Error('Unsupported image format. Please select a JPG, JPEG, PNG, or WebP image.'),
     };
   }
+
+  // Max 10 MB limit
+  const MAX_FILE_SIZE = 10 * 1024 * 1024;
+  if (file.size > MAX_FILE_SIZE) {
+    return {
+      url: null,
+      error: new Error(`File is too large (${(file.size / (1024 * 1024)).toFixed(1)} MB). Maximum allowed size is 10 MB.`),
+    };
+  }
+
+  const readDataUrl = (): Promise<string> =>
+    new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
+
+  const previewUrl = await readDataUrl();
+  const hasLive = await isSupabaseSession();
+  const client = getSupabaseClient();
+
+  // 1. Try Supabase Storage if configured and active
+  if (hasLive && client) {
+    try {
+      const fileExt = ext || 'jpg';
+      const cleanExt = fileExt.replace(/[^a-z0-9]/g, '');
+      const fileName = `${cardId}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.${cleanExt}`;
+      const filePath = `categories/${fileName}`;
+
+      const { data, error } = await client.storage
+        .from('website-assets')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true,
+        });
+
+      if (!error && data?.path) {
+        const { data: publicUrlData } = client.storage.from('website-assets').getPublicUrl(data.path);
+        return { url: publicUrlData.publicUrl, error: null };
+      }
+    } catch {
+      // Supabase failed, continue to server upload fallback
+    }
+  }
+
+  // 2. Upload to persistent server endpoint /api/upload
+  try {
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filename: file.name,
+        dataUrl: previewUrl,
+        folder: 'categories',
+      }),
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      if (result.success && result.url) {
+        return { url: result.url, error: null };
+      }
+    }
+  } catch {
+    // If backend /api/upload endpoint is not reached, fallback to previewUrl
+  }
+
+  // 3. Graceful fallback to data URL
+  return { url: previewUrl, error: null };
 }
+
