@@ -11,6 +11,9 @@ export interface InquiryPayload {
   consentGiven: boolean;
   marketingConsent?: boolean;
   _website_bot_check?: string; // Honeypot field
+  emailAlreadyDelivered?: boolean;
+  deliveryProvider?: string;
+  submissionId?: string;
 }
 
 export interface InquiryResult {
@@ -210,6 +213,16 @@ Target Destination: ${TARGET_RECIPIENT}
 }
 
 export function handleInquirySubmission(req: IncomingMessage, res: ServerResponse) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
+
+  if (req.method === 'OPTIONS') {
+    res.statusCode = 204;
+    res.end();
+    return;
+  }
+
   if (req.method !== 'POST') {
     res.statusCode = 405;
     res.setHeader('Content-Type', 'application/json');
@@ -283,9 +296,58 @@ export function handleInquirySubmission(req: IncomingMessage, res: ServerRespons
         return;
       }
 
-      const submissionId = `VQ-${Date.now().toString().slice(-6)}`;
+      // Sanitize submission ID or generate standard VQ-XXXXXX identifier
+      const submissionId =
+        data.submissionId && /^VQ-[\dA-Za-z_-]{4,12}$/.test(data.submissionId)
+          ? data.submissionId
+          : `VQ-${Date.now().toString().slice(-6)}`;
 
-      // 3. Attempt delivery to muksboogie1@gmail.com
+      // 3. Check if email was already delivered client-side (e.g. via direct Web3Forms)
+      if (data.emailAlreadyDelivered) {
+        const provider =
+          typeof data.deliveryProvider === 'string' && data.deliveryProvider.trim().length > 0 && data.deliveryProvider.length < 50
+            ? data.deliveryProvider.trim()
+            : 'Web3Forms Direct Client Delivery';
+
+        // Record in-memory audit log for review without dispatching a duplicate email
+        inquiryLogStore.unshift({
+          id: submissionId,
+          timestamp: new Date().toISOString(),
+          name: data.name.trim(),
+          email: data.email?.trim() || 'Not provided',
+          telephone: data.telephone?.trim() || 'Not provided',
+          category: data.category.trim(),
+          selectedProduct: data.selectedProduct?.trim() || 'None specified',
+          messageSnippet: data.message.trim().slice(0, 120),
+          delivered: true,
+          provider,
+        });
+        if (inquiryLogStore.length > 50) inquiryLogStore.pop();
+
+        const responsePayload: InquiryResult = {
+          success: true,
+          submissionId,
+          delivered: true,
+          provider: data.deliveryProvider || 'Web3Forms Direct Client Delivery',
+          recipient: TARGET_RECIPIENT,
+          timestamp: new Date().toISOString(),
+          message: `Your inquiry has been successfully received for our stonemasonry team at ${TARGET_RECIPIENT}. We will contact you via your specified channel shortly.`,
+          inquiry: {
+            id: submissionId,
+            name: data.name.trim(),
+            contactChannel: data.email?.trim() || data.telephone?.trim() || 'Not specified',
+            category: data.category.trim(),
+            product: data.selectedProduct?.trim(),
+          },
+        };
+
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify(responsePayload));
+        return;
+      }
+
+      // 4. Server-side delivery attempt to muksboogie1@gmail.com
       const deliveryAttempt = await deliverInquiryEmail(data, submissionId);
 
       // Record in-memory audit log
@@ -303,11 +365,28 @@ export function handleInquirySubmission(req: IncomingMessage, res: ServerRespons
       });
       if (inquiryLogStore.length > 50) inquiryLogStore.pop();
 
-      // Transparent, professional response format
+      // If email delivery failed, do not falsely report success
+      if (!deliveryAttempt.delivered) {
+        res.statusCode = 502;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(
+          JSON.stringify({
+            success: false,
+            submissionId,
+            delivered: false,
+            provider: deliveryAttempt.provider,
+            error: deliveryAttempt.error || 'Email dispatch failed. Please follow up directly via WhatsApp.',
+            errors: [deliveryAttempt.error || 'Email dispatch failed. Please follow up directly via WhatsApp.'],
+          })
+        );
+        return;
+      }
+
+      // Transparent, professional success response
       const responsePayload: InquiryResult = {
         success: true,
         submissionId,
-        delivered: deliveryAttempt.delivered,
+        delivered: true,
         provider: deliveryAttempt.provider,
         recipient: TARGET_RECIPIENT,
         timestamp: new Date().toISOString(),

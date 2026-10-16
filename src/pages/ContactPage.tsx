@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { Phone, Mail, MapPin, MessageCircle, Clock, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
+import { Phone, Mail, MapPin, MessageCircle, Clock, AlertCircle, ArrowRight, HelpCircle } from 'lucide-react';
 import { SEOHead } from '../components/common/SEOHead';
 import { PageHeader } from '../components/common/PageHeader';
 import { useContent } from '../context/ContentContext';
 import { SITE_CONFIG, getWhatsAppUrl } from '../config/siteConfig';
+import { InquirySuccessConfirmation } from '../components/common/InquirySuccessConfirmation';
+import { sendInquiry } from '../services/inquiryService';
 
 export function ContactPage() {
   const { content } = useContent();
@@ -12,13 +14,25 @@ export function ContactPage() {
   const [emailOrPhone, setEmailOrPhone] = useState('');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [successMsg, setSuccessMsg] = useState('');
+  const [submissionSuccess, setSubmissionSuccess] = useState<{
+    submissionId: string;
+  } | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
+  const [uncertainMsg, setUncertainMsg] = useState('');
+
+  const handleReset = () => {
+    setSubmissionSuccess(null);
+    setName('');
+    setEmailOrPhone('');
+    setMessage('');
+    setErrorMsg('');
+    setUncertainMsg('');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
-    setSuccessMsg('');
+    setUncertainMsg('');
 
     if (!name.trim() || name.trim().length < 2) {
       setErrorMsg('Please enter your full name (minimum 2 characters).');
@@ -37,56 +51,26 @@ export function ContactPage() {
     const isEmail = emailOrPhone.includes('@');
 
     try {
-      // 1. Direct client-side delivery via Web3Forms (accepted by Web3Forms free tier from browsers)
-      let deliveredDirectly = false;
-      try {
-        const web3Response = await fetch('https://api.web3forms.com/submit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({
-            access_key: SITE_CONFIG.emailService.web3formsAccessKey,
-            to_email: SITE_CONFIG.contact.email,
-            from_name: `Velquarath Stoneworks (${name.trim()})`,
-            subject: `Contact Inquiry: General Stonework - ${name.trim()}`,
-            name: name.trim(),
-            email: isEmail ? emailOrPhone.trim() : SITE_CONFIG.contact.email,
-            phone: !isEmail ? emailOrPhone.trim() : 'Provided via email',
-            category: 'General Stonework',
-            message: message.trim(),
-          }),
-        });
-        const web3Data = await web3Response.json();
-        if (web3Response.ok && web3Data.success) {
-          deliveredDirectly = true;
-        }
-      } catch {
-        // Fallback to server endpoint
-      }
-
-      // 2. Also log and process on the server endpoint
-      const serverResponse = await fetch('/api/inquiries', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          email: isEmail ? emailOrPhone.trim() : undefined,
-          telephone: !isEmail ? emailOrPhone.trim() : undefined,
-          category: 'General Stonework',
-          message: message.trim(),
-          consentGiven: true,
-        }),
+      const result = await sendInquiry({
+        name: name.trim(),
+        email: isEmail ? emailOrPhone.trim() : undefined,
+        telephone: !isEmail ? emailOrPhone.trim() : undefined,
+        category: 'General Stonework',
+        message: message.trim(),
+        consentGiven: true,
       });
-      const serverData = await serverResponse.json();
 
-      if (deliveredDirectly || (serverResponse.ok && serverData.success)) {
-        setSuccessMsg(
-          `Thank you, ${name.trim()}! Your message has been sent directly to our stonemason team at ${SITE_CONFIG.contact.email}. We will respond shortly.`
-        );
+      if (result.status === 'success') {
+        setSubmissionSuccess({
+          submissionId: result.submissionId,
+        });
         setName('');
         setEmailOrPhone('');
         setMessage('');
+      } else if (result.status === 'uncertain') {
+        setUncertainMsg(result.message);
       } else {
-        setErrorMsg((serverData.errors && serverData.errors[0]) || 'Failed to submit inquiry. Please try again or use WhatsApp.');
+        setErrorMsg(result.message || 'Failed to submit inquiry. Please try again or use WhatsApp.');
       }
     } catch {
       setErrorMsg('Connection error. Please try again or reach us immediately on WhatsApp (+263 78 696 7793).');
@@ -235,27 +219,63 @@ export function ContactPage() {
             </div>
           </div>
 
-          {/* Quick Message Form */}
+          {/* Quick Message Form or Success Confirmation */}
           <div className="bg-[#1D2023] border border-[#2D3237] p-8 rounded-lg space-y-6">
-            <h3 className="font-serif text-2xl text-[#F5F1E8] font-bold">
-              Send an Instant Message
-            </h3>
+            {submissionSuccess ? (
+              <InquirySuccessConfirmation
+                submissionId={submissionSuccess.submissionId}
+                category="General Stonework"
+                onReset={handleReset}
+                resetButtonText="Send Another Message"
+              />
+            ) : (
+              <>
+                <h3 className="font-serif text-2xl text-[#F5F1E8] font-bold">
+                  Send an Instant Message
+                </h3>
 
-            {successMsg && (
-              <div className="bg-emerald-950/40 border border-emerald-600/40 p-4 rounded text-xs text-emerald-300 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-                <span>{successMsg}</span>
-              </div>
-            )}
+                {errorMsg && (
+                  <div
+                    role="alert"
+                    aria-live="assertive"
+                    className="bg-rose-950/40 border border-rose-600/40 p-4 rounded text-xs text-rose-300 flex items-start gap-2"
+                  >
+                    <AlertCircle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+                    <div className="space-y-1">
+                      <span className="font-semibold block">Submission Error</span>
+                      <p>{errorMsg}</p>
+                    </div>
+                  </div>
+                )}
 
-            {errorMsg && (
-              <div className="bg-rose-950/40 border border-rose-600/40 p-4 rounded text-xs text-rose-300 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
-                <span>{errorMsg}</span>
-              </div>
-            )}
+                {uncertainMsg && (
+                  <div
+                    role="alert"
+                    aria-live="polite"
+                    className="bg-amber-950/40 border border-amber-600/40 p-4 rounded text-xs text-amber-200 space-y-3"
+                  >
+                    <div className="flex items-start gap-2">
+                      <HelpCircle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+                      <div className="space-y-1">
+                        <span className="font-semibold block text-amber-300">Delivery Status Unconfirmed</span>
+                        <p>{uncertainMsg}</p>
+                      </div>
+                    </div>
+                    <div className="pt-1">
+                      <a
+                        href={getWhatsAppUrl('Hello Velquarath Stoneworks, I attempted to submit an inquiry through your website and would like to follow up directly.')}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 bg-[#25D366] hover:bg-[#20BA5A] text-[#121415] text-xs font-semibold uppercase tracking-wider py-2 px-3 rounded transition-colors"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        <span>Connect on WhatsApp</span>
+                      </a>
+                    </div>
+                  </div>
+                )}
 
-            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+                <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <div>
                 <label htmlFor="contact-name" className="block text-xs uppercase tracking-wider text-[#B9B5AC] mb-1 font-semibold">
                   Full Name *
@@ -309,6 +329,8 @@ export function ContactPage() {
                 {isSubmitting ? 'Sending Message...' : 'Send Message to Stonemasons'}
               </button>
             </form>
+            </>
+          )}
           </div>
         </div>
       </div>

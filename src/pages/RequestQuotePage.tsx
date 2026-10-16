@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Send, CheckCircle2, AlertCircle, MessageCircle, Info, ShieldCheck, Loader2 } from 'lucide-react';
+import { Send, AlertCircle, MessageCircle, Info, ShieldCheck, Loader2, HelpCircle } from 'lucide-react';
 import { SEOHead } from '../components/common/SEOHead';
 import { PageHeader } from '../components/common/PageHeader';
 import { PRODUCTS } from '../data/products';
 import { SITE_CONFIG, getWhatsAppUrl, getProductWhatsAppUrl } from '../config/siteConfig';
+import { InquirySuccessConfirmation } from '../components/common/InquirySuccessConfirmation';
+import { sendInquiry } from '../services/inquiryService';
 
 export function RequestQuotePage() {
   const [searchParams] = useSearchParams();
@@ -22,16 +24,12 @@ export function RequestQuotePage() {
   // Form submission states
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<string[]>([]);
-  const [submissionResult, setSubmissionResult] = useState<{
-    success: boolean;
-    submissionId?: string;
-    delivered?: boolean;
-    provider?: string;
-    recipient?: string;
-    message?: string;
-    timestamp?: string;
-    setupInstructions?: string;
+  const [submissionSuccess, setSubmissionSuccess] = useState<{
+    submissionId: string;
+    category?: string;
+    product?: string;
   } | null>(null);
+  const [uncertainMsg, setUncertainMsg] = useState('');
 
   // Pre-populate from URL query params
   useEffect(() => {
@@ -88,7 +86,8 @@ export function RequestQuotePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormErrors([]);
-    setSubmissionResult(null);
+    setUncertainMsg('');
+    setSubmissionSuccess(null);
 
     if (!validateForm()) {
       return;
@@ -97,72 +96,35 @@ export function RequestQuotePage() {
     setIsSubmitting(true);
 
     try {
-      // 1. Direct client-side dispatch via Web3Forms (accepted by Web3Forms free tier from client browsers)
-      let deliveredDirectly = false;
-      try {
-        const web3Response = await fetch('https://api.web3forms.com/submit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-          body: JSON.stringify({
-            access_key: SITE_CONFIG.emailService.web3formsAccessKey,
-            to_email: SITE_CONFIG.contact.email,
-            from_name: `Velquarath Stoneworks (${name.trim()})`,
-            subject: `Quotation Request: ${category} - ${name.trim()}`,
-            name: name.trim(),
-            email: email.trim() || SITE_CONFIG.contact.email,
-            phone: telephone.trim() || 'Not provided',
-            category,
-            product: selectedProduct || 'General inquiry',
-            message: message.trim(),
-          }),
-        });
-        const web3Data = await web3Response.json();
-        if (web3Response.ok && web3Data.success) {
-          deliveredDirectly = true;
-        }
-      } catch {
-        // Fallback to server endpoint
-      }
-
-      // 2. Server endpoint for logging and server-side fallback
-      const response = await fetch('/api/inquiries', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: name.trim(),
-          email: email.trim() || undefined,
-          telephone: telephone.trim() || undefined,
-          category,
-          selectedProduct: selectedProduct || undefined,
-          message: message.trim(),
-          consentGiven,
-          marketingConsent,
-          _website_bot_check: honeypot, // Spam honeypot
-        }),
+      const result = await sendInquiry({
+        name: name.trim(),
+        email: email.trim() || undefined,
+        telephone: telephone.trim() || undefined,
+        category,
+        selectedProduct: selectedProduct || undefined,
+        message: message.trim(),
+        consentGiven,
+        marketingConsent,
+        honeypot,
       });
 
-      const data = await response.json();
-
-      if (deliveredDirectly || (response.ok && data.success)) {
-        setSubmissionResult({
-          success: true,
-          submissionId: data.submissionId || `VQ-${Date.now().toString().slice(-6)}`,
-          delivered: deliveredDirectly || data.delivered,
-          provider: deliveredDirectly ? 'Web3Forms Direct' : data.provider,
-          recipient: SITE_CONFIG.contact.email,
-          message: `Thank you, ${name.trim()}! Your quotation request has been sent to our stonemasonry desk at ${SITE_CONFIG.contact.email}. We will review your specifications and reach out shortly.`,
-          timestamp: data.timestamp || new Date().toISOString(),
+      if (result.status === 'success') {
+        setSubmissionSuccess({
+          submissionId: result.submissionId,
+          category,
+          product: selectedProduct,
         });
-        // Reset message but keep contact details for ease of use
         setMessage('');
+      } else if (result.status === 'uncertain') {
+        setUncertainMsg(result.message);
       } else {
-        const errorList = data.errors || [data.error || 'The server encountered an issue processing your inquiry. Please try again or use WhatsApp.'];
+        const errorList = [
+          result.message ||
+            'The server encountered an issue processing your quotation request. Please try again or use WhatsApp.',
+        ];
         setFormErrors(errorList);
       }
     } catch {
-      // Graceful offline/network failure handling
       setFormErrors([
         'Unable to connect to the inquiry submission service. Please verify your connection or contact us directly on WhatsApp (+263 78 696 7793).',
       ]);
@@ -189,70 +151,73 @@ export function RequestQuotePage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
           {/* Main Form Column (7 cols) */}
           <div className="lg:col-span-7 bg-[#1D2023] border border-[#2D3237] p-6 sm:p-10 rounded-lg shadow-xl space-y-6">
-            <div>
-              <h2 className="font-serif text-2xl text-[#F5F1E8] font-bold">
-                Project & Memorial Inquiry
-              </h2>
-              <p className="text-xs text-[#B9B5AC] mt-1">
-                Fields marked with an asterisk (<span className="text-[#B79A68]">*</span>) are required.
-              </p>
-            </div>
-
-            {/* Success Confirmation Banner */}
-            {submissionResult && submissionResult.success && (
-              <div
-                role="status"
-                aria-live="polite"
-                className="p-5 rounded-lg space-y-3 text-[#DFD9CB] animate-in fade-in border bg-emerald-950/40 border-emerald-600/40"
-              >
-                <div className="flex items-center gap-2 font-semibold text-sm text-emerald-400">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                  <span>Quotation Request Successfully Submitted</span>
+            {submissionSuccess ? (
+              <InquirySuccessConfirmation
+                submissionId={submissionSuccess.submissionId}
+                category={submissionSuccess.category}
+                product={submissionSuccess.product}
+                onReset={() => setSubmissionSuccess(null)}
+                resetButtonText="Submit Another Quote Request"
+              />
+            ) : (
+              <>
+                <div>
+                  <h2 className="font-serif text-2xl text-[#F5F1E8] font-bold">
+                    Project & Memorial Inquiry
+                  </h2>
+                  <p className="text-xs text-[#B9B5AC] mt-1">
+                    Fields marked with an asterisk (<span className="text-[#B79A68]">*</span>) are required.
+                  </p>
                 </div>
 
-                <p className="text-xs leading-relaxed text-[#DFD9CB]">
-                  {submissionResult.message}
-                </p>
-
-                <div className="pt-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                  <a
-                    href={getWhatsAppUrl(`Hello, I recently submitted quotation request #${submissionResult.submissionId} for ${category}. Could we discuss stone options on WhatsApp?`)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center gap-2 text-xs font-semibold uppercase tracking-wider bg-[#25D366] hover:bg-[#20BA5A] text-[#121415] py-2.5 px-4 rounded transition-colors"
+                {/* Uncertain Delivery Notice */}
+                {uncertainMsg && (
+                  <div
+                    role="alert"
+                    aria-live="polite"
+                    className="bg-amber-950/40 border border-amber-600/40 p-4 rounded-lg space-y-3 text-xs text-amber-200 animate-in fade-in"
                   >
-                    <MessageCircle className="w-4 h-4" />
-                    <span>Follow Up on WhatsApp</span>
-                  </a>
-                </div>
+                    <div className="flex items-start gap-2">
+                      <HelpCircle className="w-4 h-4 shrink-0 text-amber-400 mt-0.5" />
+                      <div className="space-y-1">
+                        <span className="font-semibold block text-amber-300">Delivery Status Unconfirmed</span>
+                        <p>{uncertainMsg}</p>
+                      </div>
+                    </div>
+                    <div className="pt-1">
+                      <a
+                        href={getWhatsAppUrl(`Hello Velquarath Stoneworks, I attempted to submit a quotation request for ${category} on your website and would like to follow up directly.`)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 bg-[#25D366] hover:bg-[#20BA5A] text-[#121415] text-xs font-semibold uppercase tracking-wider py-2 px-3 rounded transition-colors"
+                      >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        <span>Connect on WhatsApp</span>
+                      </a>
+                    </div>
+                  </div>
+                )}
 
-                <div className="text-[11px] text-[#8E8B82] pt-2 border-t border-[#2D3237] flex items-center justify-between">
-                  <span>Reference ID: <strong className="text-emerald-300">{submissionResult.submissionId}</strong></span>
-                  <span>{new Date(submissionResult.timestamp || '').toLocaleTimeString()}</span>
-                </div>
-              </div>
-            )}
+                {/* Error Message List */}
+                {formErrors.length > 0 && (
+                  <div
+                    role="alert"
+                    aria-live="assertive"
+                    className="bg-rose-950/40 border border-rose-600/40 p-4 rounded-lg space-y-1.5 text-xs text-rose-200 animate-in fade-in"
+                  >
+                    <div className="flex items-center gap-2 text-rose-400 font-semibold">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>Please resolve the following issues:</span>
+                    </div>
+                    <ul className="list-disc pl-5 space-y-1 text-rose-300 text-[11px]">
+                      {formErrors.map((err, idx) => (
+                        <li key={idx}>{err}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
-            {/* Error Message List */}
-            {formErrors.length > 0 && (
-              <div
-                role="alert"
-                aria-live="assertive"
-                className="bg-rose-950/40 border border-rose-600/40 p-4 rounded-lg space-y-1.5 text-xs text-rose-200 animate-in fade-in"
-              >
-                <div className="flex items-center gap-2 text-rose-400 font-semibold">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>Please resolve the following issues:</span>
-                </div>
-                <ul className="list-disc pl-5 space-y-1 text-rose-300 text-[11px]">
-                  {formErrors.map((err, idx) => (
-                    <li key={idx}>{err}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+                <form onSubmit={handleSubmit} className="space-y-5" noValidate>
               {/* Spam Honeypot (Hidden from real users, caught by bots) */}
               <div className="hidden" aria-hidden="true">
                 <label htmlFor="website_hp">Leave this empty</label>
@@ -414,6 +379,8 @@ export function RequestQuotePage() {
                 </button>
               </div>
             </form>
+            </>
+          )}
           </div>
 
           {/* Right Column: Direct WhatsApp & Consultation Channels (5 cols) */}
